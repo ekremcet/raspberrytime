@@ -45,6 +45,12 @@ input[type=text], input[type=password] { min-height: 44px; padding: 0 12px; bord
 .durum { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
 .nokta { width: 8px; height: 8px; border-radius: 50%; background: #2E9E5B; }
 .nokta.yok { background: var(--danger); }
+.kayit-durum { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 10; display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 999px; font-weight: 700; font-size: 14px; background: var(--ink); color: var(--bg); box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+.kayit-durum.tamam { background: #2E9E5B; color: #fff; }
+.kayit-durum.hata { background: var(--danger); color: #fff; }
+.ad-durum { font-size: 13px; font-weight: 600; min-width: 92px; }
+.ad-durum.bekliyor { color: var(--muted); } .ad-durum.tamam { color: #2E9E5B; } .ad-durum.hata { color: var(--danger); }
+.foto.yukleniyor::after { content: "Yükleniyor…"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.6); color: #fff; font-size: 12px; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -75,6 +81,7 @@ input[type=text], input[type=password] { min-height: 44px; padding: 0 12px; bord
 
     <section class="kart">
       <h2>Kutudaki kişiler</h2>
+      <p class="kucuk" style="margin:0 0 6px">Değişiklikler otomatik kaydedilir ve kutunun ekranına hemen yansır. Her kayıttan sonra altta yeşil <b>Kaydedildi</b> yazısı çıkar.</p>
       <div id="kisiler"></div>
     </section>
 
@@ -85,6 +92,7 @@ input[type=text], input[type=password] { min-height: 44px; padding: 0 12px; bord
   </div>
 </main>
 <input type="file" id="dosya" accept="image/*" hidden>
+<div class="kayit-durum" id="kayitDurum" role="status" aria-live="polite" hidden></div>
 
 <script>
 (function () {
@@ -136,8 +144,9 @@ function ciz() {
   $("kisiler").innerHTML = onayli.length ? onayli.map((k, i) => `<div class="kisi" data-id="${k.id}">
       <button class="foto" style="background:${esc(k.renk)}" data-is="foto" aria-label="${esc(k.ad)} fotoğrafını değiştir">${fotoHTML(k)}<span>Fotoğraf</span></button>
       <div class="alanlar">
-        <div class="satir"><input type="text" value="${esc(k.ad)}" maxlength="30" aria-label="Ad" data-is="ad" style="flex:1;min-width:140px">
-          ${k.tg_ad && k.tg_ad !== k.ad ? `<span class="kucuk">Telegram: ${esc(k.tg_ad)}</span>` : ""}</div>
+        <div class="satir"><input type="text" value="${esc(k.ad)}" maxlength="30" aria-label="Kutuda görünecek ad" data-is="ad" data-eski="${esc(k.ad)}" style="flex:1;min-width:140px" enterkeyhint="done">
+          <span class="ad-durum" id="adDurum${k.id}"></span></div>
+        ${k.tg_ad && k.tg_ad !== k.ad ? `<div class="kucuk">Telegram'daki adı: ${esc(k.tg_ad)}</div>` : ""}
         <div class="renkler">${RENKLER.map(r => `<button style="background:${r}" data-is="renk" data-renk="${r}" class="${r === k.renk ? "secili" : ""}" aria-label="Renk ${r}"></button>`).join("")}</div>
         <div class="satir"><button data-is="yukari" ${i === 0 ? "disabled" : ""} aria-label="Yukarı taşı">↑</button><button data-is="asagi" ${i === onayli.length - 1 ? "disabled" : ""} aria-label="Aşağı taşı">↓</button>
           <button data-is="deneme">Deneme mesajı</button><button class="tehlike" data-is="sil">Kaldır</button></div>
@@ -146,30 +155,58 @@ function ciz() {
   $("engelliler").innerHTML = eng.map(k => `<div class="satir kisi" data-id="${k.id}" style="display:flex"><span style="flex:1">${esc(k.tg_ad)}</span><button data-is="ac">Engeli kaldır</button><button class="tehlike" data-is="sil">Sil</button></div>`).join("");
 }
 
-async function guncelle(id, veri) { await api("/api/yonetim/kisi/" + id, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(veri) }); await yukle(); }
+let durumT = null;
+function kayitDurum(tur, yazi) {
+  const d = $("kayitDurum"); clearTimeout(durumT);
+  d.className = "kayit-durum " + tur; d.textContent = yazi; d.hidden = false;
+  if (tur !== "bekliyor") durumT = setTimeout(() => d.hidden = true, tur === "hata" ? 5000 : 2200);
+}
+// Her yazma işlemi: "Kaydediliyor…" → "✓ Kaydedildi" ya da "Kaydedilemedi"
+async function kaydet(is, tamamYazi = "✓ Kaydedildi") {
+  kayitDurum("bekliyor", "Kaydediliyor…");
+  try { const r = await is(); kayitDurum("tamam", tamamYazi); return r; }
+  catch (err) { if (err.message !== "PIN") kayitDurum("hata", "Kaydedilemedi: " + (err.message || "bağlantı yok").slice(0, 80)); throw err; }
+}
+async function guncelle(id, veri, yazi) { await kaydet(async () => { await api("/api/yonetim/kisi/" + id, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(veri) }); await yukle(); }, yazi); }
 document.addEventListener("click", async e => {
   const b = e.target.closest("[data-is]"); if (!b) return; const satir = b.closest("[data-id]"); if (!satir) return;
   const id = +satir.dataset.id, is = b.dataset.is;
   try {
-    if (is === "onayla") await guncelle(id, { durum: 1, ad: $("ad" + id).value });
-    else if (is === "engelle") await guncelle(id, { durum: -1 });
-    else if (is === "ac") await guncelle(id, { durum: 0 });
-    else if (is === "renk") await guncelle(id, { renk: b.dataset.renk });
+    if (is === "onayla") await guncelle(id, { durum: 1, ad: $("ad" + id).value }, "✓ Onaylandı, kutuda görünüyor");
+    else if (is === "engelle") await guncelle(id, { durum: -1 }, "✓ Engellendi");
+    else if (is === "ac") await guncelle(id, { durum: 0 }, "✓ Engel kaldırıldı");
+    else if (is === "renk") await guncelle(id, { renk: b.dataset.renk }, "✓ Renk kaydedildi");
     else if (is === "foto") { fotoHedef = id; $("dosya").value = ""; $("dosya").click(); }
-    else if (is === "deneme") { b.disabled = true; await api("/api/yonetim/deneme/" + id, { method: "POST" }); b.textContent = "Gönderildi"; setTimeout(() => { b.textContent = "Deneme mesajı"; b.disabled = false; }, 2000); }
+    else if (is === "deneme") { b.disabled = true; try { await kaydet(() => api("/api/yonetim/deneme/" + id, { method: "POST" }), "✓ Deneme mesajı kutuya gönderildi"); } finally { setTimeout(() => { b.disabled = false; }, 2000); } }
     else if (is === "sil") { if (b.dataset.onay !== "1") { b.dataset.onay = "1"; b.textContent = "Emin misin? Tekrar dokun"; setTimeout(() => { b.dataset.onay = ""; b.textContent = is === "sil" && satir.closest("#engelliler") ? "Sil" : "Kaldır"; }, 3000); return; }
-      await api("/api/yonetim/kisi/" + id, { method: "DELETE" }); await yukle(); }
+      await kaydet(async () => { await api("/api/yonetim/kisi/" + id, { method: "DELETE" }); await yukle(); }, "✓ Kaldırıldı"); }
     else if (is === "yukari" || is === "asagi") {
       const ids = KISILER.filter(k => k.durum === 1).map(k => k.id); const i = ids.indexOf(id), j = is === "yukari" ? i - 1 : i + 1;
       [ids[i], ids[j]] = [ids[j], ids[i]];
-      await api("/api/yonetim/sira", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idler: ids }) }); await yukle();
+      await kaydet(async () => { await api("/api/yonetim/sira", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idler: ids }) }); await yukle(); }, "✓ Sıra kaydedildi");
     }
-  } catch (err) { if (err.message !== "PIN") alertKutu(err.message); }
+  } catch (err) { /* kayitDurum hatayı gösterdi */ }
 });
-document.addEventListener("change", async e => {
-  const inp = e.target; if (inp.dataset.is !== "ad") return; const id = +inp.closest("[data-id]").dataset.id;
-  try { await guncelle(id, { ad: inp.value }); } catch (err) {}
+// Ad: yazmayı bırakınca (1 sn), Enter'a basınca ya da alandan çıkınca kaydedilir
+const adZaman = {};
+async function adKaydet(inp) {
+  const id = +inp.closest("[data-id]").dataset.id, yeni = inp.value.trim(), dur = $("adDurum" + id);
+  clearTimeout(adZaman[id]); adZaman[id] = null;
+  if (!yeni || yeni === inp.dataset.eski) { if (dur && !yeni) { dur.className = "ad-durum hata"; dur.textContent = "Ad boş olamaz"; } return; }
+  if (dur) { dur.className = "ad-durum bekliyor"; dur.textContent = "Kaydediliyor…"; }
+  try {
+    await kaydet(() => api("/api/yonetim/kisi/" + id, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ad: yeni }) }), "✓ Ad kaydedildi");
+    inp.dataset.eski = yeni; const k = KISILER.find(x => x.id === id); if (k) k.ad = yeni;
+    if (dur) { dur.className = "ad-durum tamam"; dur.textContent = "✓ Kaydedildi"; setTimeout(() => { if (dur.textContent === "✓ Kaydedildi") dur.textContent = ""; }, 3000); }
+  } catch (err) { if (dur) { dur.className = "ad-durum hata"; dur.textContent = "Kaydedilemedi"; } }
+}
+document.addEventListener("input", e => {
+  const inp = e.target; if (inp.dataset.is !== "ad") return; const id = +inp.closest("[data-id]").dataset.id, dur = $("adDurum" + id);
+  if (dur) { dur.className = "ad-durum bekliyor"; dur.textContent = inp.value.trim() === inp.dataset.eski ? "" : "Kaydedilmedi…"; }
+  clearTimeout(adZaman[id]); adZaman[id] = setTimeout(() => adKaydet(inp), 1000);
 });
+document.addEventListener("change", e => { if (e.target.dataset.is === "ad") adKaydet(e.target); });
+document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.dataset.is === "ad") { e.preventDefault(); e.target.blur(); } });
 function alertKutu(m) { const p = document.createElement("p"); p.className = "not"; p.textContent = "Olmadı: " + m; document.querySelector("main").prepend(p); setTimeout(() => p.remove(), 5000); }
 
 $("dosya").addEventListener("change", async () => {
@@ -179,12 +216,13 @@ $("dosya").addEventListener("change", async () => {
   const c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth * o); c.height = Math.round(img.naturalHeight * o);
   c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
   const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.86));
-  try { await api("/api/yonetim/foto/" + fotoHedef, { method: "POST", headers: { "Content-Type": "image/jpeg" }, body: blob }); await yukle(); }
-  catch (err) { if (err.message !== "PIN") alertKutu(err.message); }
+  const kutu = document.querySelector(`[data-id="${fotoHedef}"] .foto`); if (kutu) kutu.classList.add("yukleniyor");
+  try { await kaydet(async () => { await api("/api/yonetim/foto/" + fotoHedef, { method: "POST", headers: { "Content-Type": "image/jpeg" }, body: blob }); await yukle(); }, "✓ Fotoğraf kaydedildi"); }
+  catch (err) { if (kutu) kutu.classList.remove("yukleniyor"); }
 });
 
 if (PIN) yukle().catch(() => {});
-setInterval(() => { if (PIN && !$("icerik").hidden && !document.activeElement?.matches("input")) yukle().catch(() => {}); }, 15000);
+setInterval(() => { if (PIN && !$("icerik").hidden && !document.activeElement?.matches("input") && !Object.values(adZaman).some(Boolean)) yukle().catch(() => {}); }, 15000);
 })();
 </script>
 </body>
