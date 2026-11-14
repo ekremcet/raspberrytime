@@ -40,9 +40,7 @@ def ayarlari_oku():
         "KUTU_ADI": "Mesaj Kutusu",
         "PORT": "8080",
         "MAKS_SANIYE": "60",
-        "UYKU_DAKIKA": "5",
         "HATIRLAT_DAKIKA": "10",       # dinlenmemiş mesaj varken hatırlatma zili (0: kapalı)
-        "SESSIZ_SAATLER": "",          # örn. 21:00-07:30
         "UZAKTAN_ARAYUZ": "0",         # 1: çocuk ekranı ev ağındaki başka cihazlardan da açılabilir
         "VERI_KLASORU": str(BASE / "veri"),
         "TELEGRAM_API": "https://api.telegram.org",
@@ -61,16 +59,33 @@ def ayarlari_oku():
     return cfg
 
 
-def sessiz_mi(aralik):
-    """'21:00-07:30' gibi bir aralığın içinde miyiz?"""
-    m = re.fullmatch(r"\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*", aralik or "")
-    if not m:
+SAAT_RE = re.compile(r"([01]?\d|2[0-3]):([0-5]\d)")
+
+
+def dakika(saat):
+    m = SAAT_RE.fullmatch((saat or "").strip())
+    return int(m[1]) * 60 + int(m[2]) if m else None
+
+
+def aralikta(bas, bit, simdi=None):
+    """'19:30' ile '07:30' arası gibi (gece yarısını geçebilen) bir aralıkta mıyız?"""
+    a, b = dakika(bas), dakika(bit)
+    if a is None or b is None or a == b:
         return False
-    a = int(m[1]) * 60 + int(m[2])
-    b = int(m[3]) * 60 + int(m[4])
-    now = datetime.now()
-    t = now.hour * 60 + now.minute
+    simdi = simdi or datetime.now()
+    t = simdi.hour * 60 + simdi.minute
     return a <= t < b if a < b else (t >= a or t < b)
+
+
+# Yönetim sayfasından değiştirilebilen ayarlar (veritabanında saklanır)
+AYAR_VARSAYILAN = {
+    "sessiz_elle": "0",        # 1: yönetici sessiz moda aldı (kapatana kadar)
+    "gece_otomatik": "1",      # 1: her gece belirtilen saatlerde kendiliğinden sessiz
+    "gece_baslangic": "19:30",
+    "gece_bitis": "07:30",
+    "uyku_dakika": "2",        # dokunulmazsa ekran bu kadar dakika sonra kararır (saat görünür)
+    "gece_yanit": "1",         # 1: sessizken gelen ilk mesaja gönderene kısa bilgi notu
+}
 
 
 # ----------------------------------------------------------------- veri
@@ -230,6 +245,35 @@ class Kutu:
             for i, ad in enumerate(["Anne", "Baba", "Babaanne"]):
                 self.depo.kisi_ekle(-(i + 1), ad, None, durum=1)
 
+    # ---- ayarlar ve sessiz mod
+    def ayar(self, k):
+        v = self.depo.meta("ayar_" + k)
+        return AYAR_VARSAYILAN[k] if v is None else v
+
+    def ayar_yaz(self, k, v):
+        self.depo.meta("ayar_" + k, v)
+
+    def gece_mi(self):
+        return self.ayar("gece_otomatik") == "1" and aralikta(self.ayar("gece_baslangic"), self.ayar("gece_bitis"))
+
+    def sessiz_mi(self):
+        return self.ayar("sessiz_elle") == "1" or self.gece_mi()
+
+    def sessiz_donemi(self):
+        """Aynı sessiz dönem içinde gönderene yalnızca bir kez not yazmak için dönem kimliği."""
+        if self.ayar("sessiz_elle") == "1":
+            return "elle-" + (self.depo.meta("sessiz_elle_zaman") or "")
+        simdi = datetime.now()
+        gun = simdi.date()
+        if dakika(self.ayar("gece_baslangic")) > simdi.hour * 60 + simdi.minute:   # gece yarısından sonra
+            gun = gun.fromordinal(gun.toordinal() - 1)
+        return "gece-" + gun.isoformat()
+
+    def ayarlar_json(self):
+        d = {k: self.ayar(k) for k in AYAR_VARSAYILAN}
+        d.update(simdi_sessiz=self.sessiz_mi(), simdi_gece=self.gece_mi(), saat=datetime.now().strftime("%H:%M"))
+        return d
+
     def _pin_uret(self):
         f = self.veri / "yonetici_pin.txt"
         if f.exists():
@@ -343,8 +387,15 @@ class Kutu:
             sure = float(ses.get("duration") or 0) or await sure_olc(hedef)
             self.depo.mesaj_guncelle(mid, dosya=hedef.name, sure=sure)
             self.budama(k["id"])
-            log.info("sesli mesaj geldi: %s (%.1f sn)", k["ad"], sure)
+            log.info("sesli mesaj geldi: %s (%.1f sn)%s", k["ad"], sure, " [sessiz]" if self.sessiz_mi() else "")
             await self.yayinla({"tur": "mesaj", "kisi": k["id"], "yon": "gelen"})
+            if self.sessiz_mi() and self.ayar("gece_yanit") == "1":
+                donem = self.sessiz_donemi()
+                if self.depo.meta(f"sessiz_not_{k['id']}") != donem:
+                    self.depo.meta(f"sessiz_not_{k['id']}", donem)
+                    ne_zaman = (f"saat {self.ayar('gece_bitis')}'te" if self.ayar("sessiz_elle") != "1" else "sessiz mod kapanınca")
+                    await self.metin(chat_id, f"🌙 {self.cfg['KUTU_ADI']} şu an sessiz modda. Mesajın kaydedildi, "
+                                              f"{ne_zaman} bildirim olarak görünecek.")
         elif msg.get("text", "").startswith("/start"):
             await self.metin(chat_id, f"Merhaba {ilk_ad}! Buraya gönderdiğin sesli mesajlar {self.cfg['KUTU_ADI']} ekranına düşer.")
         else:
@@ -427,7 +478,8 @@ async def durum(req):
         "SELECT kisi, COUNT(*) n FROM mesajlar WHERE yon='gelen' AND dinlendi=0 AND dosya IS NOT NULL GROUP BY kisi")}
     return web.json_response({
         "kutu_adi": b.cfg["KUTU_ADI"], "maks_saniye": int(b.cfg["MAKS_SANIYE"]),
-        "uyku_dakika": float(b.cfg["UYKU_DAKIKA"]), "sessiz": sessiz_mi(b.cfg["SESSIZ_SAATLER"]),
+        "uyku_dakika": float(b.ayar("uyku_dakika")), "sessiz": b.sessiz_mi(), "gece": b.gece_mi(),
+        "gece_bitis": b.ayar("gece_bitis"),
         "hatirlat_dakika": float(b.cfg.get("HATIRLAT_DAKIKA") or 0), "surum": SURUM,
         "cevrimici": b.cevrimici, "demo": b.demo, "neden": b.neden,
         "kisiler": [kisi_json(k, sayi.get(k["id"], 0)) for k in kisiler],
@@ -613,6 +665,29 @@ async def y_deneme(req):
     return web.json_response({"id": mid})
 
 
+async def y_ayarlar(req):
+    yonetici(req)
+    b = kutu(req)
+    if req.method == "POST":
+        veri = await req.json()
+        for k, v in veri.items():
+            if k not in AYAR_VARSAYILAN:
+                raise web.HTTPBadRequest(text=f"bilinmeyen ayar: {k}")
+            v = str(v).strip()
+            if k in ("gece_baslangic", "gece_bitis") and dakika(v) is None:
+                raise web.HTTPBadRequest(text="Saat SS:DD biçiminde olmalı (örn. 19:30)")
+            if k == "uyku_dakika" and not (v.replace(".", "", 1).isdigit() and 0.5 <= float(v) <= 120):
+                raise web.HTTPBadRequest(text="Ekran kararma süresi 0.5–120 dakika olmalı")
+            if k in ("sessiz_elle", "gece_otomatik", "gece_yanit"):
+                v = "1" if v in ("1", "true", "True") else "0"
+                if k == "sessiz_elle" and v == "1" and b.ayar("sessiz_elle") != "1":
+                    b.depo.meta("sessiz_elle_zaman", int(time.time()))
+            b.ayar_yaz(k, v)
+        log.info("ayarlar güncellendi: %s", veri)
+        await b.yayinla({"tur": "ayarlar"})
+    return web.json_response(b.ayarlar_json())
+
+
 def statik(ad):
     async def h(req):
         return web.FileResponse(BASE / "static" / ad, headers={"Cache-Control": "no-cache"})
@@ -669,6 +744,8 @@ def uygulama(cfg=None):
         web.post("/api/yonetim/sira", y_sira),
         web.delete("/api/yonetim/kisi/{kid}", y_sil),
         web.post("/api/yonetim/deneme/{kid}", y_deneme),
+        web.get("/api/yonetim/ayarlar", y_ayarlar),
+        web.post("/api/yonetim/ayarlar", y_ayarlar),
     ])
     app.on_startup.append(baslangic)
     app.on_cleanup.append(kapanis)

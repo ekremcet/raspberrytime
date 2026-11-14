@@ -188,12 +188,22 @@ Ekran, sunucu güncellenince kendini yeniler.
 | `YONETICI_PIN` | rastgele | Yönetim sayfası PIN'i |
 | `KUTU_ADI` | Mesaj Kutusu | Yönetim sayfasında ve bot yanıtlarında geçen ad |
 | `MAKS_SANIYE` | 60 | En uzun kayıt süresi; dolunca kayıt kendiliğinden biter ve gider |
-| `UYKU_DAKIKA` | 5 | Dokunulmazsa ekran kararır; yeni mesaj gelince ya da dokununca uyanır |
 | `HATIRLAT_DAKIKA` | 10 | Dinlenmemiş mesaj varken hatırlatma zili aralığı (0: kapalı) |
-| `SESSIZ_SAATLER` | 21:00-07:30 | Bu aralıkta zil ve hatırlatma çalmaz |
 | `EKRAN_DONDUR` | boş | 0/90/180/270: ekran yönü. Boşsa sistem ayarı |
 | `PORT` | 8080 | Sunucu portu |
 | `UZAKTAN_ARAYUZ` | 0 | 1: çocuk ekranı ağdaki başka cihazdan da açılır (deneme için) |
+
+### Yönetim sayfasındaki ayarlar
+
+Şu ayarlar dosyadan değil, yönetim sayfasının **Sessiz mod ve gece** bölümünden değiştirilir ve hemen geçerli olur:
+
+| Ayar | Varsayılan | Ne işe yarar |
+|---|---|---|
+| **Şimdi sessiz moda al** | kapalı | Sen kapatana kadar zil çalmaz, ekran yeni mesajla uyanmaz |
+| **Her gece kendiliğinden sessiz moda geç** | açık | Başlangıç–bitiş saatleri arasında otomatik sessiz + gece görünümü |
+| Başlangıç / Bitiş | 19:30 / 07:30 | Gece aralığı (gece yarısını geçebilir) |
+| **Ekran kararma** | 2 dakika | Dokunulmazsa ekran kararır ve 24 saatlik saat gösterir |
+| **"Sabah görülecek" notu** | açık | Sessizken mesaj gönderen kişiye, o sessiz dönemde bir kez kısa bilgi notu gider |
 
 ---
 
@@ -203,8 +213,10 @@ Ekran, sunucu güncellenince kendini yeniler.
 - **Kişi ekranı:** iki büyük düğme.
   - Solda **dinle**: o kişiden gelen **son** sesli mesajı çalar, istendiği kadar tekrar dinlenir. Yeni mesajsa parlar.
   - Sağda **mikrofon**: dokun, konuş, kareye dokun. Mesaj hemen gönderilir ve ana ekrana dönülür; altta "Anne'ye gönderildi" yazar.
-- **Zil:** yeni mesaj gelince üç notalı zil çalar, ekran uyuyorsa uyanır.
-- **Uyku:** `UYKU_DAKIKA` boyunca dokunulmazsa ekran kararır. Kişi ekranında 2 dakika işlem yapılmazsa ana ekrana dönülür.
+- **Zil:** yeni mesaj gelince üç notalı zil çalar, ekran uyuyorsa uyanır. Dinlenmemiş mesaj varsa `HATIRLAT_DAKIKA`'da bir hafif zil tekrar çalar.
+- **Ekran kararması:** varsayılan 2 dakika dokunulmazsa ekran kararır ve büyük, 24 saatlik bir **saat** ile tarih gösterir (iz kalmasın diye saat her dakika hafifçe yer değiştirir). Dokununca uyanır. Kişi ekranında en geç 2 dakika sonra ana ekrana dönülür.
+- **Sessiz mod:** zil ve hatırlatma çalmaz, yeni mesaj ekranı uyandırmaz. Mesajlar yine gelir; kutucuklar parlar, rozetler görünür, çocuk ekrana dokununca görür.
+- **Gece (varsayılan 19:30–07:30):** otomatik sessiz mod + ekran koyu ve kısık renklere geçer; karardığında saat sıcak, kısık bir renkte ve ay simgesiyle görünür.
 - **İnternet giderse:** üstte "İnternet yok, mesajlar sonra gidecek" yazar; giden mesajlar saklanır ve bağlantı gelince gönderilir.
 
 ---
@@ -223,7 +235,7 @@ sudo journalctl _SYSTEMD_USER_UNIT=mesajkutusu.service -n 30 --no-pager
 | Yönetim sayfasında kırmızı nokta | Sunucu yeni başladıysa ilk bağlantı birkaç saniye sürer. Kalıcıysa yukarıdaki gibi günlüğe bak. |
 | Görüntü ters | [5. Ekran yönü](#5-ekran-yönü) |
 | Dokunuşlar ters yere düşüyor | Ekran döndürülmüş ama dokunmatik bağlanmamış: 5B'deki komutu çalıştır ya da Screens › Touchscreen'den DSI'ya ata |
-| Zil / ses duyulmuyor | [6. Ses](#6-ses): hoparlör varsayılan mı, ses seviyesi kaç? |
+| Zil / ses duyulmuyor | Yönetim sayfasında sessiz mod ya da gece modu açık mı? Değilse [6. Ses](#6-ses): hoparlör varsayılan mı, ses seviyesi kaç? |
 | "Mikrofon bulunamadı" | `wpctl status`'ta BOYA `Sources` altında görünüyor mu? USB uzatmayı çıkarıp tak. |
 | Yönetim sayfası açılmıyor | Telefon aynı Wi-Fi'de mi? `mesajkutusu.local` yerine IP dene (`hostname -I`). |
 | İlk kurulum bitmedi | Kartı Mac'e tak, `bootfs/mesajkutusu-kurulum.log`'a bak. "İnternet yok" ise Wi-Fi bilgileri eksik. |
@@ -279,6 +291,7 @@ yazilim/
 | `GET /ws` | Canlı olaylar: yeni mesaj, bağlantı, kişi değişikliği |
 | `GET /yonetim` | Yönetim sayfası |
 | `/api/yonetim/...` | `X-Yonetici-Pin` başlığı ile: bilgi, kişiler, onay/güncelle, fotoğraf, sıra, sil, deneme |
+| `GET/POST /api/yonetim/ayarlar` | Sessiz mod, gece saatleri, ekran kararma, gece notu (veritabanında saklanır) |
 
 ### Elle kurulum (SD kart yöntemi yerine)
 

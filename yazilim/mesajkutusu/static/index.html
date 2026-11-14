@@ -99,8 +99,18 @@ h1 { margin: 0; font-size: clamp(26px, 6vh, 50px); font-weight: 900; letter-spac
 
 .baglanti { position: absolute; top: 1.4vh; left: 50%; transform: translateX(-50%); background: #fff; color: var(--muted); border-radius: 999px; padding: .6vh 1.4vw; font-size: 2.2vh; font-weight: 800; box-shadow: 0 4px 14px rgba(29, 36, 51, .12); display: flex; align-items: center; gap: 8px; z-index: 5; }
 .baglanti svg { width: 2.6vh; height: 2.6vh; }
-.uyku { position: fixed; inset: 0; background: #000; z-index: 20; opacity: 0; pointer-events: none; transition: opacity 1.2s; }
-.uyku.acik { opacity: .96; pointer-events: auto; }
+.uyku { position: fixed; inset: 0; background: #000; z-index: 20; opacity: 0; pointer-events: none; transition: opacity 1.2s; display: flex; align-items: center; justify-content: center; }
+.uyku.acik { opacity: 1; pointer-events: auto; }
+.saat-kutu { display: flex; flex-direction: column; align-items: center; gap: 1vh; color: #C9D2E3; transition: transform 2s; font-variant-numeric: tabular-nums; }
+.saat { font-size: 30vh; font-weight: 800; letter-spacing: -.02em; line-height: 1; }
+.tarih { font-size: 5vh; font-weight: 700; color: #7E899C; display: flex; align-items: center; gap: 1.4vh; }
+.tarih svg { width: 5vh; height: 5vh; }
+.uyku.gece .saat-kutu { color: #6E5A3A; }          /* gece: kısık, sıcak renk */
+.uyku.gece .tarih { color: #4A3D29; }
+body.gece { --bg: #0F1420; --ink: #E6EAF2; --muted: #98A2B5; --idle-bg: #1A2233; --rec-bg: #3A1A1D; }
+body.gece .kutucuk, body.gece .dinle, body.gece .panel, body.gece .geri, body.gece .hap { filter: brightness(.72); }
+body.gece .kutucuk .ad, body.gece .geri { background: #1C2433; color: #E6EAF2; }
+body.gece .hap { background: #2A2416; color: #E9C98A; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
@@ -153,7 +163,7 @@ h1 { margin: 0; font-size: clamp(26px, 6vh, 50px); font-weight: 900; letter-spac
 
 <div class="baglanti" id="baglanti" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2l20 20"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M5 12.86a10 10 0 0 1 5.17-2.69"/><path d="M19 12.86a10 10 0 0 0-2.01-1.48"/><path d="M12 20h.01"/></svg><span id="baglantiYazi">İnternet yok, mesajlar sonra gidecek</span></div>
 <div class="bildirim" id="bildirim" hidden></div>
-<div class="uyku" id="uyku"></div>
+<div class="uyku" id="uyku"><div class="saat-kutu" id="saatKutu"><div class="saat" id="saat">--:--</div><div class="tarih" id="tarih"></div></div></div>
 <audio id="ses" preload="none"></audio>
 
 <script>
@@ -168,7 +178,7 @@ const IK = {
   hata: '<svg class="durum-ik hata" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><path d="M12 16.5v.01"/></svg>',
   tamam: '<svg class="durum-ik tamam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
 };
-let D = { kisiler: [], maks_saniye: 60, uyku_dakika: 5, sessiz: false, cevrimici: true };
+let D = { kisiler: [], maks_saniye: 60, uyku_dakika: 2, sessiz: false, gece: false, cevrimici: true };
 function baglantiGoster() {
   $("baglanti").hidden = D.cevrimici || D.demo;
   $("baglantiYazi").textContent = D.neden === "anahtar" ? "Bot anahtarı hatalı (ayarlar.env)" : "İnternet yok, mesajlar sonra gidecek";
@@ -205,6 +215,7 @@ function ciz() {
       <div class="gorsel">${foto(k)}</div><span class="ad">${k.ad}</span>${k.okunmamis ? `<span class="rozet">${k.okunmamis}</span>` : ""}</button>`).join("");
   const yazan = ks.filter(k => k.okunmamis).map(k => k.ad);
   $("hap").hidden = !yazan.length; $("hapYazi").textContent = yazan.join(" ve ") + " sana yazdı";
+  document.body.classList.toggle("gece", !!D.gece); $("uyku").classList.toggle("gece", !!D.gece);
   if (simdiki) baslikCiz();
 }
 $("izgara").addEventListener("click", e => { const b = e.target.closest(".kutucuk"); if (b) kisiAc(+b.dataset.id); });
@@ -332,7 +343,7 @@ function bagla() {
   ws.onopen = () => { wsBekle = 1000; durumAl(); mesajlariAl(); };
   ws.onmessage = e => {
     const o = JSON.parse(e.data);
-    if (o.tur === "mesaj") { if (o.yon === "gelen") { uyandir(); zil(); } durumAl(); if (o.kisi === simdiki) mesajlariAl(); }
+    if (o.tur === "mesaj") { if (o.yon === "gelen" && !D.sessiz) { uyandir(); zil(); } durumAl(); if (o.kisi === simdiki) mesajlariAl(); }
     else if (o.tur === "baglanti") { D.cevrimici = o.cevrimici; D.neden = o.neden || ""; baglantiGoster(); }
     else durumAl();
   };
@@ -347,9 +358,24 @@ $("uyku").addEventListener("pointerdown", e => { e.stopPropagation(); e.preventD
 setInterval(() => {
   const bos = (Date.now() - sonDokunma) / 60000;
   if (mod === "kayit" || !ses.paused) { sonDokunma = Date.now(); return; }
-  if (simdiki && bos > 2) anaya();
-  if (bos > D.uyku_dakika) $("uyku").classList.add("acik");
+  if (simdiki && bos > Math.min(2, D.uyku_dakika || 2)) anaya();
+  if (bos > (D.uyku_dakika || 2)) $("uyku").classList.add("acik");
 }, 5000);
+/* ---------- saat (24 saat) ---------- */
+const GUNLER = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
+const AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+const AY_IK = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z"/></svg>';
+let sonDakika = -1;
+function saatCiz() {
+  const t = new Date(), p = n => String(n).padStart(2, "0");
+  $("saat").textContent = p(t.getHours()) + ":" + p(t.getMinutes());
+  $("tarih").innerHTML = (D.gece ? AY_IK : "") + `<span>${GUNLER[t.getDay()]}, ${t.getDate()} ${AYLAR[t.getMonth()]}</span>`;
+  if (t.getMinutes() !== sonDakika) {        // ekranda iz kalmasın diye saat her dakika biraz kayar
+    sonDakika = t.getMinutes();
+    $("saatKutu").style.transform = `translate(${Math.round(Math.random() * 8 - 4)}vw, ${Math.round(Math.random() * 8 - 4)}vh)`;
+  }
+}
+saatCiz(); setInterval(saatCiz, 5000);
 setInterval(durumAl, 60000);
 document.addEventListener("contextmenu", e => e.preventDefault());
 
