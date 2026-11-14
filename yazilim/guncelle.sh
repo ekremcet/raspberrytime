@@ -14,8 +14,14 @@ kiosk_yenile() {
   export WAYLAND_DISPLAY="$(basename "$sok")" DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
   pkill -f chromium 2>/dev/null || true
   sleep 2
-  setsid "$1/sistem/kiosk.sh" >/dev/null 2>&1 < /dev/null &
-  echo "==> Ekran yeniden açıldı"
+  # Uzak kabuk kapanınca ekran da kapanmasın diye kullanıcı servisi olarak başlatılır
+  if systemd-run --user --collect --quiet --unit="mesajkutusu-ekran-$(date +%s)" \
+       -E WAYLAND_DISPLAY="$WAYLAND_DISPLAY" -E XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
+       -E DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" "$1/sistem/kiosk.sh"; then
+    echo "==> Ekran yeniden açıldı"
+  else
+    echo "    Ekran yeniden açılamadı; 'sudo reboot' ile yeniden başlat"
+  fi
 }
 
 ana() {
