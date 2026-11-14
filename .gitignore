@@ -1,0 +1,8 @@
+# Kişisel veriler ve gizli ayarlar asla depoya girmez
+ayarlar.env
+veri/
+*.yedek*
+__pycache__/
+*.pyc
+.DS_Store
+._*

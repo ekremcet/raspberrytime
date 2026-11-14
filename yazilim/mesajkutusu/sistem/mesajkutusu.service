@@ -1,0 +1,16 @@
+[Unit]
+Description=Sesli Mesaj Kutusu sunucusu
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=__DIR__
+ExecStartPre=-/bin/sh -c 'test /boot/firmware/mesajkutusu/ayarlar.env -nt __DIR__/ayarlar.env && cp /boot/firmware/mesajkutusu/ayarlar.env __DIR__/ayarlar.env; exit 0'
+ExecStart=/usr/bin/python3 __DIR__/server.py
+Restart=always
+RestartSec=3
+TimeoutStopSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

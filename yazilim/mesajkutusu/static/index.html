@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Mesaj Kutusu</title>
+<style>
+:root {
+  --bg: #F3F6FB; --card: #FFFFFF; --ink: #1D2433; --muted: #5B6577;
+  --accent: #2F6FED; --rec: #D93036; --rec-bg: #FFE9EA; --send-bg: #FFF4E0; --ok: #2E9E5B; --ok-bg: #E6F6EC;
+  --idle-bg: #E8F0FF; --badge: #D93036; --ring: #FF8A00; --bubble-out: #DCE8FF; --bubble-in: #F1F3F7;
+  font-family: "Nunito", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+button { font: inherit; color: inherit; border: none; cursor: pointer; background: none; padding: 0; }
+button:focus-visible { outline: 4px solid var(--ink); outline-offset: 4px; }
+[hidden] { display: none !important; }
+
+.ekran { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 3.2vh 3.6vw 4vh; gap: 3vh; }
+.ust { display: flex; align-items: center; justify-content: space-between; gap: 2vw; min-height: 9vh; }
+h1 { margin: 0; font-size: clamp(26px, 6vh, 50px); font-weight: 900; letter-spacing: -.5px; }
+.hap { display: flex; align-items: center; gap: 10px; background: #FFF1DE; color: #8A4B00; padding: 1.2vh 1.6vw; border-radius: 999px; font-size: clamp(16px, 3.2vh, 26px); font-weight: 800; }
+.hap svg { width: 1.2em; height: 1.2em; }
+
+/* ana ekran */
+.izgara { flex: 1; min-height: 0; display: grid; gap: 2.4vw; grid-template-columns: repeat(var(--sutun, 3), minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); }
+.kutucuk { position: relative; border-radius: 36px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(29, 36, 51, .14); background: var(--renk); transition: transform .12s; }
+.kutucuk:active { transform: scale(.97); }
+.kutucuk .gorsel { flex: 1; min-height: 0; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; position: relative; }
+.foto-arka { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(16px) brightness(.8); transform: scale(1.2); }
+.foto-on { position: relative; width: 100%; height: 100%; object-fit: contain; }
+.kutucuk .gorsel svg { width: 62%; height: 88%; }
+.kutucuk .ad { background: #fff; padding: 1vh 1vw 1.3vh; font-size: clamp(18px, 4.4vh, 36px); font-weight: 900; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kutucuk.yeni { animation: parla 1.6s ease-in-out infinite; }
+@keyframes parla { 0%, 100% { box-shadow: 0 0 0 6px var(--ring), 0 10px 30px rgba(29, 36, 51, .14); } 50% { box-shadow: 0 0 0 14px rgba(255, 138, 0, .35), 0 10px 30px rgba(29, 36, 51, .14); } }
+.rozet { position: absolute; top: 2vh; right: 1.8vw; min-width: 7.5vh; height: 7.5vh; padding: 0 1.6vh; border-radius: 999px; background: var(--badge); color: #fff; font-size: 4vh; font-weight: 900; display: flex; align-items: center; justify-content: center; border: 4px solid #fff; }
+.bos { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--muted); text-align: center; font-size: clamp(16px, 3vh, 24px); font-weight: 700; }
+.bos b { color: var(--ink); font-size: 1.3em; }
+
+/* kişi ekranı */
+.geri { width: 11vh; height: 11vh; border-radius: 50%; background: #fff; box-shadow: 0 6px 18px rgba(29, 36, 51, .1); display: flex; align-items: center; justify-content: center; flex: none; }
+.geri svg { width: 52%; height: 52%; }
+.baslik { display: flex; align-items: center; gap: 2vw; min-width: 0; }
+.avatar { width: 11vh; height: 11vh; border-radius: 3vh; background: var(--renk); overflow: hidden; display: flex; align-items: flex-end; justify-content: center; flex: none; border: 4px solid #fff; box-shadow: 0 6px 18px rgba(29, 36, 51, .14); position: relative; }
+.avatar svg { width: 82%; height: 82%; }
+.govde { flex: 1; min-height: 0; display: flex; gap: 2.4vw; }
+.mesajlar { flex: 1; min-width: 0; background: #fff; border-radius: 36px; box-shadow: 0 10px 30px rgba(29, 36, 51, .08); padding: 3vh 2vw; display: flex; flex-direction: column; gap: 2.2vh; overflow-y: auto; scroll-behavior: smooth; }
+.mesajlar::-webkit-scrollbar { width: 10px; } .mesajlar::-webkit-scrollbar-thumb { background: #D5DBE5; border-radius: 10px; }
+.satir { display: flex; align-items: flex-start; gap: 1.2vw; }
+.satir.giden { justify-content: flex-end; }
+.kucuk-av { width: 11vh; height: 11vh; border-radius: 3vh; flex: none; overflow: hidden; background: var(--renk); display: flex; align-items: flex-end; justify-content: center; }
+.kucuk-av img { width: 100%; height: 100%; object-fit: cover; }
+.kucuk-av svg { width: 84%; height: 84%; }
+.balon { display: flex; align-items: center; gap: 1.4vw; padding: 1.4vh 2vw 1.4vh 1.4vh; border-radius: 6vh; background: var(--bubble-in); max-width: 86%; position: relative; }
+.giden .balon { background: var(--bubble-out); }
+.balon.yeni::after { content: ""; position: absolute; top: -4px; right: -4px; width: 22px; height: 22px; border-radius: 50%; background: var(--badge); border: 3px solid #fff; }
+.oynat { width: 9vh; height: 9vh; border-radius: 50%; flex: none; background: var(--renk); color: #fff; display: flex; align-items: center; justify-content: center; }
+.giden .oynat { background: var(--accent); }
+.oynat svg { width: 45%; height: 45%; }
+.dalga { display: flex; align-items: center; gap: 4px; height: 6vh; }
+.dalga i { display: block; width: 6px; border-radius: 3px; background: #9AA3B5; transform-origin: center; }
+.caliyor .dalga i { background: var(--ink); animation: dalga .7s ease-in-out infinite; }
+@keyframes dalga { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
+.sure { font-size: 3vh; font-weight: 800; color: #3B4456; min-width: 3em; font-variant-numeric: tabular-nums; }
+.durum-ik { width: 3.6vh; height: 3.6vh; flex: none; }
+.durum-ik.hata { color: var(--rec); } .durum-ik.bekle { color: var(--muted); } .durum-ik.tamam { color: var(--ok); }
+.dinle { flex: 1; min-width: 0; border-radius: 36px; background: color-mix(in srgb, var(--renk) 16%, #fff); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3vh; padding: 3vh 2vw; transition: opacity .2s; }
+.dinle.yeni { animation: parla 1.6s ease-in-out infinite; }
+.dinle.yok { opacity: .45; }
+.dinle .oynat-b { width: 42vh; height: 42vh; max-width: 100%; aspect-ratio: 1; border-radius: 50%; background: var(--renk); color: #fff; box-shadow: 0 18px 40px rgba(29, 36, 51, .25); display: flex; align-items: center; justify-content: center; }
+.dinle .oynat-b svg { width: 42%; height: 42%; }
+.dinle .oynat-b:disabled { box-shadow: none; cursor: default; }
+.dinle .dalga { height: 8vh; }
+.dinle .dalga i { width: 7px; }
+.dinle.caliyor .dalga i { background: var(--ink); animation: dalga .7s ease-in-out infinite; }
+.kayitta .dinle { opacity: .3; pointer-events: none; }
+.bildirim { position: fixed; left: 50%; bottom: 5vh; transform: translateX(-50%); background: var(--ok); color: #fff; border-radius: 999px; padding: 2vh 4vh; font-size: clamp(18px, 4.4vh, 34px); font-weight: 900; display: flex; align-items: center; gap: 2vh; box-shadow: 0 10px 30px rgba(29, 36, 51, .25); z-index: 10; animation: pop .3s ease-out; }
+.bildirim.hata { background: var(--rec); }
+.bildirim svg { width: 5vh; height: 5vh; }
+.panel { flex: 1; min-width: 0; border-radius: 36px; background: var(--idle-bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3vh; padding: 3vh 2vw; transition: background .3s; }
+.panel.kayit { background: var(--rec-bg); } .panel.gonderiliyor { background: var(--send-bg); } .panel.gitti { background: var(--ok-bg); } .panel.hata { background: var(--rec-bg); }
+.mik { width: 42vh; height: 42vh; max-width: 100%; aspect-ratio: 1; border-radius: 50%; background: var(--accent); color: #fff; box-shadow: 0 18px 40px rgba(47, 111, 237, .35); display: flex; align-items: center; justify-content: center; position: relative; }
+.mik svg { width: 42%; height: 42%; position: relative; }
+.kayit .mik { background: var(--rec); box-shadow: none; }
+.kayit .mik::before { content: ""; position: absolute; inset: 0; border-radius: 50%; background: #E5484D; animation: nabiz 1.4s ease-out infinite; }
+@keyframes nabiz { 0% { transform: scale(1); opacity: .55; } 100% { transform: scale(1.4); opacity: 0; } }
+.etiket { font-size: clamp(18px, 4.4vh, 34px); font-weight: 900; text-align: center; }
+.canli { display: flex; align-items: center; gap: 5px; height: 8vh; }
+.canli i { display: block; width: 7px; border-radius: 4px; background: var(--rec); height: 10%; transition: height .08s; }
+.sayac { font-size: 6vh; font-weight: 900; color: #A8141A; font-variant-numeric: tabular-nums; line-height: 1; }
+.cubuk { width: 70%; height: 16px; border-radius: 8px; background: #F5D9A8; overflow: hidden; }
+.cubuk i { display: block; height: 100%; background: #E08A00; width: 100%; }
+.geri-al { height: 13vh; padding: 0 5vh; border-radius: 7vh; border: 4px solid var(--ink); background: #fff; display: flex; align-items: center; gap: 2vh; font-size: 4.6vh; font-weight: 900; }
+.geri-al svg { width: 5vh; height: 5vh; }
+.tik { width: 30vh; height: 30vh; border-radius: 50%; background: var(--ok); color: #fff; display: flex; align-items: center; justify-content: center; animation: pop .35s ease-out; }
+.tik svg { width: 55%; height: 55%; }
+@keyframes pop { 0% { transform: scale(.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+.baglanti { position: absolute; top: 1.4vh; left: 50%; transform: translateX(-50%); background: #fff; color: var(--muted); border-radius: 999px; padding: .6vh 1.4vw; font-size: 2.2vh; font-weight: 800; box-shadow: 0 4px 14px rgba(29, 36, 51, .12); display: flex; align-items: center; gap: 8px; z-index: 5; }
+.baglanti svg { width: 2.6vh; height: 2.6vh; }
+.uyku { position: fixed; inset: 0; background: #000; z-index: 20; opacity: 0; pointer-events: none; transition: opacity 1.2s; }
+.uyku.acik { opacity: .96; pointer-events: auto; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<section class="ekran" id="ana">
+  <div class="ust">
+    <h1>Kime mesaj gönderelim?</h1>
+    <div class="hap" id="hap" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+      <span id="hapYazi"></span>
+    </div>
+  </div>
+  <div class="izgara" id="izgara"></div>
+  <div class="bos" id="bos" hidden><b>Henüz kimse eklenmedi</b><span>Kişileri yönetim sayfasından ekleyin: <span id="yonetimAdres"></span></span></div>
+</section>
+
+<section class="ekran" id="kisi" hidden>
+  <div class="ust">
+    <div class="baslik">
+      <button class="geri" id="geri" aria-label="Kişilere dön"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="avatar" id="kAvatar"></div>
+      <h1 id="kAd"></h1>
+    </div>
+  </div>
+  <div class="govde">
+    <div class="dinle yok" id="dinle">
+      <button class="oynat-b" id="oynatB" aria-label="Son mesajı dinle" disabled></button>
+      <div class="dalga" id="dalga2"></div>
+      <span class="etiket" id="dinleYazi">Henüz mesaj yok</span>
+    </div>
+    <div class="panel" id="panel">
+      <div id="pBos">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:3vh">
+          <button class="mik" id="mik" aria-label="Kaydı başlat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="12" rx="3" fill="currentColor"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3.5"/></svg></button>
+          <span class="etiket" id="mikYazi">Konuşmak için dokun</span>
+        </div>
+      </div>
+      <div id="pKayit" hidden style="display:flex;flex-direction:column;align-items:center;gap:2.6vh">
+        <button class="mik" id="dur" aria-label="Kaydı bitir ve gönder"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="3"/></svg></button>
+        <div class="canli" id="canli"></div>
+        <span class="sayac" id="sayac">0:00</span>
+        <span class="etiket" style="color:#7A1E22">Bitirince dokun</span>
+      </div>
+      <div id="pHata" hidden style="display:flex;flex-direction:column;align-items:center;gap:2vh;text-align:center">
+        <span class="etiket" style="color:#7A1E22" id="hataYazi">Olmadı, bir daha dene</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="baglanti" id="baglanti" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2l20 20"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M5 12.86a10 10 0 0 1 5.17-2.69"/><path d="M19 12.86a10 10 0 0 0-2.01-1.48"/><path d="M12 20h.01"/></svg><span id="baglantiYazi">İnternet yok, mesajlar sonra gidecek</span></div>
+<div class="bildirim" id="bildirim" hidden></div>
+<div class="uyku" id="uyku"></div>
+<audio id="ses" preload="none"></audio>
+
+<script>
+(function () {
+"use strict";
+const $ = id => document.getElementById(id);
+const SILUET = '<svg viewBox="0 0 100 87" aria-hidden="true"><circle cx="50" cy="34" r="22" fill="#fff" fill-opacity=".92"/><path d="M8 87c2-24 19-36 42-36s40 12 42 36z" fill="#fff" fill-opacity=".92"/></svg>';
+const IK = {
+  oynat: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>',
+  dur: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="5" height="16" rx="1.5"/><rect x="14" y="4" width="5" height="16" rx="1.5"/></svg>',
+  saat: '<svg class="durum-ik bekle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  hata: '<svg class="durum-ik hata" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><path d="M12 16.5v.01"/></svg>',
+  tamam: '<svg class="durum-ik tamam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+};
+let D = { kisiler: [], maks_saniye: 60, uyku_dakika: 5, sessiz: false, cevrimici: true };
+function baglantiGoster() {
+  $("baglanti").hidden = D.cevrimici || D.demo;
+  $("baglantiYazi").textContent = D.neden === "anahtar" ? "Bot anahtarı hatalı (ayarlar.env)" : "İnternet yok, mesajlar sonra gidecek";
+}
+let simdiki = null, mod = "bos", caliyorId = null;
+const kisiBul = id => D.kisiler.find(k => k.id === id);
+const foto = k => k.foto ? `<img class="foto-arka" src="/medya/${k.foto}" alt=""><img class="foto-on" src="/medya/${k.foto}" alt="">` : SILUET;
+const ek = ad => { const s = ad.toLowerCase(); const son = (s.match(/[aeıioöuü]/g) || ["e"]).pop(); const sesli = /[aeıioöuü]$/.test(s);
+  const ince = "eiöü".includes(son); return ad + "’" + (sesli ? "y" : "") + (ince ? "e" : "a"); };
+const sure = s => { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
+
+/* ---------- veri ---------- */
+async function durumAl() {
+  const r = await fetch("/api/durum"); D = await r.json();
+  if (window.ilkSurum && D.surum && D.surum !== window.ilkSurum) { location.reload(); return; }
+  window.ilkSurum = window.ilkSurum || D.surum;
+  baglantiGoster();
+  if (simdiki && !kisiBul(simdiki)) anaya();
+  ciz();
+}
+async function mesajlariAl() {
+  if (!simdiki) return;
+  const r = await fetch("/api/mesajlar/" + simdiki); const ms = await r.json();
+  listeCiz(ms);
+}
+
+/* ---------- ana ekran ---------- */
+function ciz() {
+  const iz = $("izgara"); const ks = D.kisiler;
+  $("bos").hidden = ks.length > 0; iz.hidden = ks.length === 0;
+  $("yonetimAdres").textContent = location.host.replace("localhost", "<cihaz-adresi>") + "/yonetim";
+  const n = ks.length; iz.style.setProperty("--sutun", n <= 3 ? Math.max(1, n) : n === 4 ? 2 : 3);
+  iz.innerHTML = ks.map(k => `<button class="kutucuk${k.okunmamis ? " yeni" : ""}" data-id="${k.id}" style="--renk:${k.renk}" aria-label="${k.ad}${k.okunmamis ? ", " + k.okunmamis + " yeni mesaj" : ""}">
+      <div class="gorsel">${foto(k)}</div><span class="ad">${k.ad}</span>${k.okunmamis ? `<span class="rozet">${k.okunmamis}</span>` : ""}</button>`).join("");
+  const yazan = ks.filter(k => k.okunmamis).map(k => k.ad);
+  $("hap").hidden = !yazan.length; $("hapYazi").textContent = yazan.join(" ve ") + " sana yazdı";
+  if (simdiki) baslikCiz();
+}
+$("izgara").addEventListener("click", e => { const b = e.target.closest(".kutucuk"); if (b) kisiAc(+b.dataset.id); });
+
+/* ---------- kişi ekranı ---------- */
+function baslikCiz() { const k = kisiBul(simdiki); if (!k) return; $("kAd").textContent = k.ad; $("kAvatar").style.setProperty("--renk", k.renk); $("kAvatar").innerHTML = foto(k); }
+function kisiAc(id) { simdiki = id; sonGelen = null; sonListe = ""; $("ana").hidden = true; $("kisi").hidden = false; baslikCiz(); panel("bos"); dinleCiz(); mesajlariAl(); }
+function anaya() { sesDur(); if (mod === "kayit") kayitIptal(); simdiki = null; $("kisi").hidden = true; $("ana").hidden = false; durumAl(); }
+let bildirimT = null;
+function bildir(yazi, hata) {
+  const b = $("bildirim"); b.className = "bildirim" + (hata ? " hata" : "");
+  b.innerHTML = (hata ? "" : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>') + yazi;
+  b.hidden = false; clearTimeout(bildirimT); bildirimT = setTimeout(() => b.hidden = true, 2600);
+}
+$("geri").addEventListener("click", anaya);
+
+function cubuklar(id, n) { let x = (id * 9301 + 49297) % 233280, s = ""; for (let i = 0; i < n; i++) { x = (x * 9301 + 49297) % 233280; s += `<i style="height:${30 + Math.round(x / 233280 * 70)}%;animation-delay:${(i % 7) * .08}s"></i>`; } return s; }
+// Kişi ekranında yalnızca SON GELEN sesli mesaj gösterilir (dinle düğmesi)
+let sonListe = "", sonGelen = null;
+function listeCiz(ms) {
+  let m = null; for (let i = ms.length - 1; i >= 0; i--) if (ms[i].yon === "gelen" && ms[i].dosya) { m = ms[i]; break; }
+  const imza = JSON.stringify(m) + caliyorId; if (imza === sonListe) return; sonListe = imza;
+  sonGelen = m; dinleCiz();
+}
+function dinleCiz() {
+  const k = kisiBul(simdiki); if (!k) return;
+  const m = sonGelen, cal = m && caliyorId === m.id, kart = $("dinle"), b = $("oynatB");
+  kart.style.setProperty("--renk", k.renk);
+  kart.classList.toggle("yok", !m); kart.classList.toggle("yeni", !!m && !m.dinlendi && !cal); kart.classList.toggle("caliyor", !!cal);
+  b.disabled = !m; b.innerHTML = cal ? IK.dur : IK.oynat; b.setAttribute("aria-label", cal ? "Durdur" : "Son mesajı dinle");
+  $("dalga2").innerHTML = cubuklar(m ? m.id : 7, 18);
+  $("dinleYazi").textContent = !m ? "Henüz mesaj yok" : cal ? "Dinliyorsun…" : !m.dinlendi ? "Yeni mesaj!" : "Tekrar dinle";
+}
+$("oynatB").addEventListener("click", () => { if (sonGelen) oynat(sonGelen.id, sonGelen.dosya, true); });
+
+/* ---------- dinleme ---------- */
+const ses = $("ses");
+function oynat(id, dosya, gelen) {
+  if (caliyorId === id) { sesDur(); return; }
+  ses.src = "/medya/" + dosya; ses.currentTime = 0;
+  ses.play().catch(() => {}); caliyorId = id; sonListe = ""; dinleCiz();
+  if (gelen) fetch("/api/dinlendi/" + id, { method: "POST" }).then(() => { if (sonGelen && sonGelen.id === id) sonGelen.dinlendi = 1; durumAl(); });
+}
+function sesDur() { ses.pause(); if (caliyorId !== null) { caliyorId = null; sonListe = ""; dinleCiz(); } }
+ses.addEventListener("ended", sesDur);
+
+/* ---------- kayıt ---------- */
+let akim = null, kaydedici = null, parcalar = [], kayitBas = 0, sayacT = null, analiz = null, animT = null;
+const ctx = window.AudioContext ? new AudioContext() : null;
+$("canli").innerHTML = "<i></i>".repeat(24);
+function panel(m) {
+  mod = m; $("panel").className = "panel " + ({ kayit: "kayit", hata: "hata" }[m] || "");
+  $("kisi").classList.toggle("kayitta", m === "kayit");
+  $("pBos").hidden = m !== "bos"; $("pKayit").hidden = m !== "kayit"; $("pHata").hidden = m !== "hata";
+}
+async function mikrofon() {
+  if (akim && akim.active) return akim;
+  akim = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
+  return akim;
+}
+async function kayitBasla() {
+  sesDur();
+  try { await mikrofon(); } catch (e) { $("hataYazi").textContent = "Mikrofon bulunamadı"; panel("hata"); setTimeout(() => panel("bos"), 2500); return; }
+  if (ctx && ctx.state === "suspended") ctx.resume();
+  const tur = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4", ""].find(t => !t || (window.MediaRecorder && MediaRecorder.isTypeSupported(t)));
+  kaydedici = new MediaRecorder(akim, tur ? { mimeType: tur, audioBitsPerSecond: 64000 } : undefined);
+  parcalar = []; kaydedici.ondataavailable = e => { if (e.data.size) parcalar.push(e.data); };
+  kaydedici.start(250); kayitBas = performance.now(); panel("kayit"); $("sayac").textContent = "0:00";
+  sayacT = setInterval(() => { const s = (performance.now() - kayitBas) / 1000; $("sayac").textContent = sure(s); if (s >= D.maks_saniye) kayitBitir(); }, 250);
+  if (ctx) { const kaynak = ctx.createMediaStreamSource(akim); analiz = ctx.createAnalyser(); analiz.fftSize = 512; kaynak.connect(analiz); canliCiz(); }
+}
+function canliCiz() {
+  const ic = $("canli").children, veri = new Uint8Array(analiz.fftSize), gecmis = new Array(24).fill(0.08);
+  const adim = () => {
+    if (mod !== "kayit") return;
+    analiz.getByteTimeDomainData(veri); let t = 0; for (const v of veri) t += (v - 128) * (v - 128);
+    gecmis.push(Math.min(1, Math.sqrt(t / veri.length) / 40 + 0.08)); gecmis.shift();
+    for (let i = 0; i < 24; i++) ic[i].style.height = (gecmis[i] * 100) + "%";
+    animT = requestAnimationFrame(adim);
+  }; adim();
+}
+function kayitDurdur() { clearInterval(sayacT); cancelAnimationFrame(animT); return new Promise(r => { if (!kaydedici || kaydedici.state === "inactive") return r(null); kaydedici.onstop = () => r(new Blob(parcalar, { type: kaydedici.mimeType || "audio/webm" })); kaydedici.stop(); }); }
+async function kayitBitir() {
+  if (mod !== "kayit") return;
+  const sn = (performance.now() - kayitBas) / 1000; const blob = await kayitDurdur();
+  if (!blob || sn < 0.8) { $("hataYazi").textContent = "Çok kısa oldu, bir daha dene"; panel("hata"); setTimeout(() => mod === "hata" && panel("bos"), 1800); return; }
+  const k = kisiBul(simdiki), kisi = simdiki;
+  panel("bos"); anaya();                                   // hemen ana ekrana dön
+  bildir(ek(k.ad) + " gönderildi");
+  try {
+    const r = await fetch("/api/gonder?kisi=" + kisi, { method: "POST", body: blob, headers: { "Content-Type": blob.type || "application/octet-stream" } });
+    if (!r.ok) throw new Error(await r.text());
+  } catch (e) { bildir("Gönderilemedi, bir daha dene", true); }
+}
+async function kayitIptal() { await kayitDurdur(); panel("bos"); }
+$("mik").addEventListener("click", kayitBasla);
+$("dur").addEventListener("click", kayitBitir);
+
+/* ---------- canlı güncelleme ---------- */
+let sonZil = 0;
+function zil(hafif) {
+  if (!ctx || D.sessiz) return; if (ctx.state === "suspended") ctx.resume();
+  sonZil = Date.now();
+  const t = ctx.currentTime + 0.05;
+  const cikis = ctx.createGain(); cikis.gain.value = hafif ? 0.4 : 0.8;
+  const sik = ctx.createDynamicsCompressor(); cikis.connect(sik).connect(ctx.destination);
+  [[659.25, 0], [880, 0.18], [1318.5, 0.36]].forEach(([f, d]) => {          // Mi - La - Mi (ding-dang-dong)
+    [[1, "sine", 1], [2, "sine", 0.25], [3, "triangle", 0.08]].forEach(([k, tip, v]) => {
+      const o = ctx.createOscillator(), g = ctx.createGain(); o.type = tip; o.frequency.value = f * k;
+      g.gain.setValueAtTime(0, t + d); g.gain.linearRampToValueAtTime(v, t + d + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0005, t + d + 1.1);
+      o.connect(g).connect(cikis); o.start(t + d); o.stop(t + d + 1.15);
+    });
+  });
+}
+// Dinlenmemiş mesaj varken her HATIRLAT_DAKIKA dakikada bir hafif hatırlatma
+setInterval(() => {
+  const dk = Number(D.hatirlat_dakika || 0); if (!dk) return;
+  const bekleyen = D.kisiler.some(k => k.okunmamis > 0);
+  if (bekleyen && Date.now() - sonZil >= dk * 60000) zil(true);
+}, 30000);
+let ws = null, wsBekle = 1000;
+function bagla() {
+  ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
+  ws.onopen = () => { wsBekle = 1000; durumAl(); mesajlariAl(); };
+  ws.onmessage = e => {
+    const o = JSON.parse(e.data);
+    if (o.tur === "mesaj") { if (o.yon === "gelen") { uyandir(); zil(); } durumAl(); if (o.kisi === simdiki) mesajlariAl(); }
+    else if (o.tur === "baglanti") { D.cevrimici = o.cevrimici; D.neden = o.neden || ""; baglantiGoster(); }
+    else durumAl();
+  };
+  ws.onclose = () => { setTimeout(bagla, wsBekle); wsBekle = Math.min(15000, wsBekle * 2); };
+}
+
+/* ---------- uyku ---------- */
+let sonDokunma = Date.now();
+function uyandir() { sonDokunma = Date.now(); $("uyku").classList.remove("acik"); }
+["pointerdown", "keydown"].forEach(ev => document.addEventListener(ev, () => { const uyuyordu = $("uyku").classList.contains("acik"); uyandir(); }, true));
+$("uyku").addEventListener("pointerdown", e => { e.stopPropagation(); e.preventDefault(); uyandir(); });
+setInterval(() => {
+  const bos = (Date.now() - sonDokunma) / 60000;
+  if (mod === "kayit" || !ses.paused) { sonDokunma = Date.now(); return; }
+  if (simdiki && bos > 2) anaya();
+  if (bos > D.uyku_dakika) $("uyku").classList.add("acik");
+}, 5000);
+setInterval(durumAl, 60000);
+document.addEventListener("contextmenu", e => e.preventDefault());
+
+durumAl().catch(() => {}); bagla();
+})();
+</script>
+</body>
+</html>
