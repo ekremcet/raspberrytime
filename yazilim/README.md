@@ -194,7 +194,7 @@ Kurulumdan sonra **bütün ayarlar yönetim sayfasından** değiştirilir ve hem
 
 ## 11. Çocuk ekranı nasıl çalışır
 
-- **Ana ekran:** onaylı kişilerin fotoğrafları. Yeni mesajı olan kişinin kutucuğu turuncu parlar ve üstünde sayı rozeti çıkar; üstte "Anne sana yazdı" yazar.
+- **Ana ekran:** yazı yok, ekranın tamamı kişilerin fotoğrafları (ad, fotoğrafın altında küçük). Bir sayfada en fazla 3×3 = 9 kişi; fazlası sonraki sayfalara geçer, parmakla kaydırarak ya da yandaki oklarla gezilir, altta sayfa noktaları görünür. Yeni mesajı olan kişinin kutucuğu turuncu parlar, üstünde sayı rozeti çıkar, o kişinin sayfasının noktası turuncu olur ve ekran kendiliğinden o sayfaya geçer.
 - **Kişi ekranı:** iki büyük düğme.
   - Solda **dinle**: dinlenmemiş mesaj varsa (örn. "3 yeni mesaj!") **hepsini eskiden yeniye sırayla** çalar ("Dinliyorsun… 2/3"); hepsi dinlendiyse yalnızca **son** mesajı çalar. Yeni mesaj varken kart parlar.
   - Sağda **mikrofon**: dokun, konuş, kareye dokun. Mesaj hemen gönderilir ve ana ekrana dönülür; altta "Anne'ye gönderildi" yazar.

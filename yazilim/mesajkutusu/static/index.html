@@ -24,14 +24,28 @@ h1 { margin: 0; font-size: clamp(26px, 6vh, 50px); font-weight: 900; letter-spac
 .hap svg { width: 1.2em; height: 1.2em; }
 
 /* ana ekran */
-.izgara { flex: 1; min-height: 0; display: grid; gap: 2.4vw; grid-template-columns: repeat(var(--sutun, 3), minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); }
+#ana { padding: 2.2vh 2.2vw; gap: 0; }
+#ana.cok { padding-bottom: 5.4vh; }
+.izgara { flex: 1; min-height: 0; display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior: contain; }
+.izgara::-webkit-scrollbar { display: none; }
+.sayfa { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; scroll-snap-stop: always; display: grid; gap: 2vh 1.8vw; padding: .6vh .6vw;
+  grid-template-columns: repeat(var(--sutun, 3), minmax(0, 1fr)); grid-template-rows: repeat(var(--satir, 1), minmax(0, 1fr)); }
+.noktalar { position: absolute; left: 0; right: 0; bottom: 1.4vh; display: flex; justify-content: center; gap: 1.6vh; pointer-events: none; }
+.noktalar i { width: 1.8vh; height: 1.8vh; border-radius: 50%; background: #C9CFDA; transition: transform .2s, background .2s; }
+.noktalar i.secili { background: var(--ink); transform: scale(1.25); }
+.noktalar i.yeni { background: var(--badge); box-shadow: 0 0 0 .5vh rgba(242, 139, 80, .35); }
+.ok { position: absolute; top: 50%; transform: translateY(-50%); width: 10vh; height: 10vh; border-radius: 50%; background: rgba(255, 255, 255, .92); color: var(--ink);
+  display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(29, 36, 51, .22); z-index: 3; }
+.ok svg { width: 55%; height: 55%; }
+.ok.sol { left: .8vw; } .ok.sag { right: .8vw; }
 .kutucuk { position: relative; border-radius: 36px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(29, 36, 51, .14); background: var(--renk); transition: transform .12s; }
 .kutucuk:active { transform: scale(.97); }
 .kutucuk .gorsel { flex: 1; min-height: 0; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; position: relative; }
 .foto-arka { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(16px) brightness(.8); transform: scale(1.2); }
 .foto-on { position: relative; width: 100%; height: 100%; object-fit: contain; }
 .kutucuk .gorsel svg { width: 62%; height: 88%; }
-.kutucuk .ad { background: #fff; padding: 1vh 1vw 1.3vh; font-size: clamp(18px, 4.4vh, 36px); font-weight: 900; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kutucuk .ad { position: absolute; left: 0; right: 0; bottom: 0; padding: 3.4vh 1vw 1.1vh; color: #fff; background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, .55));
+  font-size: clamp(15px, 3.6vh, 30px); font-weight: 900; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px rgba(0, 0, 0, .5); pointer-events: none; }
 .kutucuk.yeni { animation: parla 1.6s ease-in-out infinite; }
 @keyframes parla { 0%, 100% { box-shadow: 0 0 0 6px var(--ring), 0 10px 30px rgba(29, 36, 51, .14); } 50% { box-shadow: 0 0 0 14px rgba(255, 138, 0, .35), 0 10px 30px rgba(29, 36, 51, .14); } }
 .rozet { position: absolute; top: 2vh; right: 1.8vw; min-width: 7.5vh; height: 7.5vh; padding: 0 1.6vh; border-radius: 999px; background: var(--badge); color: #fff; font-size: 4vh; font-weight: 900; display: flex; align-items: center; justify-content: center; border: 4px solid #fff; }
@@ -109,21 +123,18 @@ h1 { margin: 0; font-size: clamp(26px, 6vh, 50px); font-weight: 900; letter-spac
 .uyku.gece .tarih { color: #4A3D29; }
 body.gece { --bg: #0F1420; --ink: #E6EAF2; --muted: #98A2B5; --idle-bg: #1A2233; --rec-bg: #3A1A1D; }
 body.gece .kutucuk, body.gece .dinle, body.gece .panel, body.gece .geri, body.gece .hap { filter: brightness(.72); }
-body.gece .kutucuk .ad, body.gece .geri { background: #1C2433; color: #E6EAF2; }
+body.gece .geri { background: #1C2433; color: #E6EAF2; }
+body.gece .ok { background: rgba(28, 36, 51, .92); color: #E6EAF2; }
 body.gece .hap { background: #2A2416; color: #E9C98A; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
 <section class="ekran" id="ana">
-  <div class="ust">
-    <h1 data-t="baslik">Kime mesaj gönderelim?</h1>
-    <div class="hap" id="hap" hidden>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
-      <span id="hapYazi"></span>
-    </div>
-  </div>
   <div class="izgara" id="izgara"></div>
+  <button class="ok sol" id="okSol" aria-label="Önceki sayfa" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+  <button class="ok sag" id="okSag" aria-label="Sonraki sayfa" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+  <div class="noktalar" id="noktalar" hidden></div>
   <div class="bos" id="bos" hidden><b data-t="bos_baslik">Henüz kimse eklenmedi</b><span><span data-t="bos_alt">Kişileri yönetim sayfasından ekleyin:</span> <span id="yonetimAdres"></span></span></div>
 </section>
 
@@ -236,18 +247,45 @@ async function mesajlariAl() {
 }
 
 /* ---------- ana ekran ---------- */
+// En fazla 3x3 = 9 kişi bir sayfada; fazlası sonraki sayfalara (kaydırarak ya da oklarla).
+const SAYFA_BOYU = 9;
+const duzen = n => n <= 1 ? [1, 1] : n === 2 ? [2, 1] : n === 3 ? [3, 1] : n === 4 ? [2, 2] : n <= 6 ? [3, 2] : [3, 3];
+let sonIzgara = "", hedefKisi = null;
+const sayfaNo = () => { const iz = $("izgara"); return iz.clientWidth ? Math.round(iz.scrollLeft / iz.clientWidth) : 0; };
+function sayfayaGit(i, yumusak) { const iz = $("izgara"); iz.scrollTo({ left: i * iz.clientWidth, behavior: yumusak ? "smooth" : "auto" }); }
+function sayfaGostergesi() {
+  const iz = $("izgara"), n = iz.children.length, i = sayfaNo();
+  $("okSol").hidden = n < 2 || i <= 0; $("okSag").hidden = n < 2 || i >= n - 1;
+  [...$("noktalar").children].forEach((d, j) => d.classList.toggle("secili", j === i));
+}
 function ciz() {
   const iz = $("izgara"); const ks = D.kisiler;
   $("bos").hidden = ks.length > 0; iz.hidden = ks.length === 0;
   $("yonetimAdres").textContent = location.host.replace("localhost", "<cihaz-adresi>") + "/yonetim";
-  const n = ks.length; iz.style.setProperty("--sutun", n <= 3 ? Math.max(1, n) : n === 4 ? 2 : 3);
-  iz.innerHTML = ks.map(k => `<button class="kutucuk${k.okunmamis ? " yeni" : ""}" data-id="${k.id}" style="--renk:${k.renk}" aria-label="${k.ad}${k.okunmamis ? ", " + k.okunmamis + " " + t("yeni_mesaj") : ""}">
-      <div class="gorsel">${foto(k)}</div><span class="ad">${k.ad}</span>${k.okunmamis ? `<span class="rozet">${k.okunmamis}</span>` : ""}</button>`).join("");
-  const yazan = ks.filter(k => k.okunmamis).map(k => k.ad);
-  $("hap").hidden = !yazan.length; $("hapYazi").textContent = t("yazdi", { adlar: yazan.join(t("ve")) });
+  const sayfalar = []; for (let i = 0; i < ks.length; i += SAYFA_BOYU) sayfalar.push(ks.slice(i, i + SAYFA_BOYU));
+  const [sut, sat] = sayfalar.length > 1 ? [3, 3] : duzen(ks.length);
+  const imza = JSON.stringify([ks, sut, sat, D.dil]);
+  if (imza !== sonIzgara) {
+    sonIzgara = imza; const eski = sayfaNo();
+    iz.innerHTML = sayfalar.map(sk => `<div class="sayfa" style="--sutun:${sut};--satir:${sat}">` + sk.map(k =>
+      `<button class="kutucuk${k.okunmamis ? " yeni" : ""}" data-id="${k.id}" style="--renk:${k.renk}" aria-label="${k.ad}${k.okunmamis ? ", " + k.okunmamis + " " + t("yeni_mesaj") : ""}">
+        <div class="gorsel">${foto(k)}</div><span class="ad">${k.ad}</span>${k.okunmamis ? `<span class="rozet">${k.okunmamis}</span>` : ""}</button>`).join("") + "</div>").join("");
+    $("noktalar").hidden = sayfalar.length < 2; $("ana").classList.toggle("cok", sayfalar.length > 1);
+    $("noktalar").innerHTML = sayfalar.map(sk => `<i class="${sk.some(k => k.okunmamis) ? "yeni" : ""}"></i>`).join("");
+    sayfayaGit(Math.min(eski, sayfalar.length - 1));
+  }
+  if (hedefKisi !== null) {                       // yeni mesaj gelen kişinin sayfasına geç
+    const i = ks.findIndex(k => k.id === hedefKisi); hedefKisi = null;
+    if (i >= 0 && !simdiki) sayfayaGit(Math.floor(i / SAYFA_BOYU), true);
+  }
+  sayfaGostergesi();
   document.body.classList.toggle("gece", !!D.gece); $("uyku").classList.toggle("gece", !!D.gece);
   if (simdiki) baslikCiz();
 }
+$("izgara").addEventListener("scroll", () => requestAnimationFrame(sayfaGostergesi), { passive: true });
+$("okSol").addEventListener("click", () => sayfayaGit(sayfaNo() - 1, true));
+$("okSag").addEventListener("click", () => sayfayaGit(sayfaNo() + 1, true));
+addEventListener("resize", () => sayfayaGit(sayfaNo()));
 $("izgara").addEventListener("click", e => { const b = e.target.closest(".kutucuk"); if (b) kisiAc(+b.dataset.id); });
 
 /* ---------- kişi ekranı ---------- */
@@ -388,7 +426,7 @@ function bagla() {
   ws.onopen = () => { wsBekle = 1000; durumAl(); mesajlariAl(); };
   ws.onmessage = e => {
     const o = JSON.parse(e.data);
-    if (o.tur === "mesaj") { if (o.yon === "gelen" && !D.sessiz) { uyandir(); zil(); } durumAl(); if (o.kisi === simdiki) mesajlariAl(); }
+    if (o.tur === "mesaj") { if (o.yon === "gelen") { hedefKisi = o.kisi; if (!D.sessiz) { uyandir(); zil(); } } durumAl(); if (o.kisi === simdiki) mesajlariAl(); }
     else if (o.tur === "baglanti") { D.cevrimici = o.cevrimici; D.neden = o.neden || ""; baglantiGoster(); }
     else if (o.tur === "zil_dene") { uyandir(); zil(false, true); }
     else durumAl();
