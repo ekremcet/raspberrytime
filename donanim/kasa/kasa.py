@@ -87,6 +87,10 @@ SPK_WALL_TOP = LIP + 12.0                     # yuva duvarı üst kotu (arka kap
 # vidalar
 SCREWS = [(sx * 94.0, sy * 82.0) for sx in (-1, 1) for sy in (-1, 1)]
 STAND_SCREWS = [(-40.0, -70.0), (40.0, -70.0)]
+# v8: tornavida erişimi. Vida başına giden kanallar normal tornavida sapı (Ø6 civarı) rahat girecek genişlikte.
+SCREW_BORE = 10.0       # arka kapak vida kolonunun iç kanalı (vida başı bu kanalın dibine oturur)
+SCREW_COL_R = 6.4       # arka kapak vida kolonunun dış yarıçapı
+STAND_BORE = 11.0       # stant vida kanalı
 
 THETA = math.radians(18)
 
@@ -207,11 +211,20 @@ def arka_kapak():
     # kamera çıkıntıları ve mikrofon kanalının hizasında etek boşluğu gerekmez (z farklı); yine de kamera bölgesini aç
     shell = shell + skirt
 
-    # vida kolonları + havşa
+    # vida kolonları (v8): vida başı Z_RIM+8'de oturur; oraya kadar Ø10 kanal + arka yüzde giriş hunisi
+    seat = Z_RIM + 8.0
+    rb = SCREW_BORE / 2
     for (x, y) in SCREWS:
-        shell = shell + cyl(Z_BACK - BACK_T - Z_RIM + 0.01, 4.0, Z_RIM, x=x, y=y)
-        shell = shell - cyl(Z_BACK - Z_RIM + 2, 1.7, Z_RIM - 1, x=x, y=y)
-        shell = shell - cyl(Z_BACK - (Z_RIM + 8) + 1, 3.3, Z_RIM + 8, x=x, y=y)
+        col = cyl(Z_BACK - BACK_T - Z_RIM + 0.01, SCREW_COL_R, Z_RIM, x=x, y=y)
+        col = col + cyl(6.0, SCREW_COL_R, Z_BACK - BACK_T - 6.0, SCREW_COL_R + 2.0, x=x, y=y)   # arka plakaya genişleyerek bağlanır
+        shell = shell + col
+        shell = shell - cyl(Z_BACK - Z_RIM + 2, 1.7, Z_RIM - 1, x=x, y=y)                    # vida gövdesi
+        shell = shell - cyl(Z_BACK - seat + 1, rb, seat, x=x, y=y)                           # tornavida kanalı
+        shell = shell - cyl(5.0 + 0.01, rb, Z_BACK - 5.0, rb + 2.0, x=x, y=y)               # giriş hunisi
+    # ön çerçevedeki mikrofon kabına değmesin (sağ üst kolon)
+    rb_cup = CUP_BORE / 2 + CUP_T
+    shell = shell - box(CH_X1 + 1.2 + 0.6 - (CUP_X0 - 0.6), 2 * rb_cup + 1.2, MIC_Z + rb_cup + 1.0 - Z_RIM + 1,
+                        (CUP_X0 - 0.6 + CH_X1 + 1.8) / 2, MIC_Y, Z_RIM - 1)
 
     # ekranı yerinde tutan dayama kolonları (uçlarına 1-2 mm köpük bant)
     z_disp_back = LIP + DT
@@ -308,8 +321,11 @@ def stant():
         h = m3.Manifold.cylinder(30, 1.7, 1.7, SEG).rotate((0, 90, 0))
         h = h.translate((-15, 0, 0)).rotate((0, 0, -math.degrees(THETA))).translate((a, b, x))
         st = st - h
-        hd = m3.Manifold.cylinder(80, 3.4, 3.4, SEG).rotate((0, 90, 0))
-        hd = hd.rotate((0, 0, -math.degrees(THETA)))
+        # v8: Ø11 tornavida kanalı; baskıda üstü damla biçimli (köprü sarkmasın)
+        r = STAND_BORE / 2
+        hd = m3.Manifold.batch_hull([m3.Manifold.cylinder(80, r, r, SEG),
+                                     m3.Manifold.cylinder(80, 0.3, 0.3, 8).translate((-r * 1.3, 0, 0))])   # dönünce +z (baskıda yukarı)
+        hd = hd.rotate((0, 90, 0)).rotate((0, 0, -math.degrees(THETA)))
         off = TW + 0.01
         st = st - hd.translate((a + off * C, b - off * S, x))
     return st
