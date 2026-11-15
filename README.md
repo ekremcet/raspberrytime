@@ -26,7 +26,7 @@ Küçük çocukların aile büyükleriyle **sesli mesajlaşabildiği**, ekranlı
 | 2 | Kasayı bas (önce küçük deneme parçası) | [donanim › 2. 3D baskı](donanim/README.md#2-3d-baskı) |
 | 3 | Telegram botunu oluştur | [yazilim › 1. Telegram botu](yazilim/README.md#1-telegram-botunu-oluştur) |
 | 4 | SD kartı yaz ve hazırla | [yazilim › 2–3](yazilim/README.md#2-sd-kartı-yaz-raspberry-pi-imager) |
-| 5 | Elektroniği ve kasayı birleştir | [donanim › 3. Montaj](donanim/README.md#3-montaj-adım-adım) |
+| 5 | Elektroniği ve kasayı birleştir (ekranı yapıştırıcı kalemle sabitle, kabloları bantla) | [donanim › 3. Montaj](donanim/README.md#3-montaj-adım-adım) · [3.9 Kablo düzeni](donanim/README.md#39-kablo-düzeni-kablolar-yerinden-çıkmasın) |
 | 6 | İlk açılış, ekran yönü, ses | [yazilim › 4–6](yazilim/README.md#4-kartı-tak-ve-aç) |
 | 7 | Kendini ve aileyi ekle | [yazilim › 7–8](yazilim/README.md#7-yönetim-sayfası-ve-ilk-kişi) |
 | 8 | Uzaktan bakım ve güncelleme | [yazilim › 9](yazilim/README.md#9-uzaktan-erişim-ve-güncelleme) |

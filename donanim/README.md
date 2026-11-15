@@ -34,8 +34,10 @@ Kasa üç baskı parçasından oluşur: ön çerçeve, arka kapak, stant. Lehim 
 | M3 × 20 vida | 4 | Arka kapağı ön çerçeveye bağlar. Plastiğe kendi diş açar, somun gerekmez |
 | M3 × 12 vida | 2 | Standı arka kapağa bağlar (isteğe bağlı) |
 | M2 × 6 vida | 4 | Kamerayı ön çerçeveye bağlar |
-| 1–2 mm köpük çift taraflı bant | biraz | Arka kapaktaki dayama kolonlarının uçlarına ve hoparlörün arkasına |
-| Küçük kablo bağı | 2–3 | Hoparlörün 1.2 m'lik kablosunu toplamak için |
+| Yapıştırıcı kalem (ya da sıcak silikon) | 1 | Ekranı çerçeveye sabitlemek için (köpük bant yerine) |
+| Kâğıt bant / izole bant | biraz | Şerit kabloları ve USB birleşimlerini sabitlemek için ([3.9](#39-kablo-düzeni-kablolar-yerinden-çıkmasın)) |
+| Küçük kablo bağı | 4–5 | Hoparlör kablosunu toplamak, güç kablosunda gerilme önleyici, USB fişleri |
+| 1–2 mm köpük çift taraflı bant | isteğe bağlı | Ekran yapıştırılmadıysa dayama kolonlarının uçlarına |
 | Yapışkanlı kauçuk ayak | 4 | Stantın altına |
 
 ---
@@ -115,8 +117,13 @@ Pin 1, GPIO başlığında SD karta en yakın köşedeki pindir; pin 2 ve 4 kart
 
 1. Ön çerçeveyi yüzüstü (ön yüzü masaya bakacak şekilde) koy.
 2. Ekranı camı aşağıda olacak şekilde yuvaya yerleştir. Yuvada her yönde 0.5 mm boşluk var; zorlamadan oturmalı.
-   Sabitlemenin en kolay yolu: ekranın **metal arka çerçevesinin** kenarlarına, yuvanın duvarına değecek şekilde birkaç nokta yapıştırıcı (sıcak silikon ya da yapıştırıcı kalem). Camın görüntü alanına ve şerit kablolara yapıştırıcı sürme. Böylece köpük bant gerekmez.
 3. Kabloların yuva duvarındaki çentiklerden rahatça geçtiğini kontrol et. Görüntü açılışta ters gelirse sorun değil, yazılımdan döndürülür ([yazılım › 5](../yazilim/README.md#5-ekran-yönü)).
+4. **Ekranı yapıştırıcı kalemle sabitle** (köpük bant yerine; köpükler yerinde durmuyor):
+   1. Ekranı yuvada son konumuna oturt, ön yüzden bakıp görüntü alanının çerçeve penceresinde ortalandığını kontrol et.
+   2. Yapıştırıcıyı ekranın **metal arka çerçevesinin dış kenarı** ile **yuva duvarının iç yüzü** arasındaki köşeye sür: her uzun kenara 2, her kısa kenara 1 nokta (toplam 6), her biri 1–2 cm.
+   3. Camın kenarına, görüntü alanına, ekranın arkasındaki adaptör kartına ve şerit kablolara yapıştırıcı **sürme**.
+   4. Kuruma süresi boyunca (paketindeki süre, genelde birkaç dakika) ön çerçeveyi yüzüstü bırak, ekranın üstüne hafif bir ağırlık koyabilirsin.
+   5. Sonradan ekranı çıkarman gerekirse noktaları maket bıçağıyla kesmek yeterli; bu yüzden kesintisiz şerit değil nokta sür.
 
 ### 3.6 Hoparlör
 
@@ -142,6 +149,22 @@ Pin 1, GPIO başlığında SD karta en yakın köşedeki pindir; pin 2 ve 4 kart
 5. Cihazı standa oturt; istersen 2 × M3 × 12 vidayla sabitle: vidayı stantın arkasındaki Ø11 kanaldan sok ve tornavidayla kanal boyunca sık. Stantın altına kauçuk ayakları yapıştır.
 
 ![Vida erişimi](gorseller/vida_erisimi.png)
+
+### 3.9 Kablo düzeni (kablolar yerinden çıkmasın)
+
+Kasa kapanırken ve cihaz taşınırken kablolar gerilip yerinden çıkabiliyor. Kapağı kapatmadan önce:
+
+| Kablo | Sorun | Çözüm |
+|---|---|---|
+| Ekran şerit kablosu (22→15) | Kilit tam kapanmazsa ya da kablo gerilirse temas kesilir, ekran kararır | Konnektör kilitlerini iki uçta da sonuna kadar kapat. Kabloyu sert kıvırmadan bir kez yumuşakça katla, katlanan yeri ekranın metal arkasına bir şerit kâğıt bant/izole bantla yapıştır. |
+| Kamera şerit kablosu | Kapak kapanırken çekilip yuvasından çıkar | Kilitleri kapat; kabloyu çentikten geçirdikten sonra ekranın arkasına bantla. Fazlasını Pi'nin yanında gevşek bir kıvrım yap. |
+| Ekran beslemesi (pin 4 / pin 6 atlama kabloları) | Dupont uçları titreşimle kolayca çıkar → ekran kapanır | İki kabloyu birbirine hafifçe bük. Pi tarafındaki iki ucun dibine yapıştırıcı kalemle küçük bir nokta sür ya da iki ucu birlikte bir tur bantla sar (pinlere yapıştırıcı akıtma). |
+| Mikrofon ↔ USB uzatma birleşimi | Fiş uzatmanın dişi ucundan ayrılır → "Mikrofon bulunamadı" | Birleşim yerini bir iki tur izole bantla sar. Uzatmayı kameranın arkasından geçirip ekranın arkasına bantla. |
+| USB hoparlör kablosu (1.2 m) | Fazla kablo kapağı zorlar, fişi Pi'den çeker | Fazlasını 8–10 cm'lik bir demet yapıp kablo bağıyla topla, demeti ekranın arkasına bantla; fiş ile demet arasında biraz boşluk bırak. |
+| Güç kablosu | Dışarıdan çekilince USB-C fişi Pi'den çıkar | Kabloyu yan delikten içeri aldıktan sonra delikten ~3 cm içeride bir kablo bağı tak (gerilme önleyici): dışarıdan çekilince bağ deliğe takılır, fiş zorlanmaz. |
+| USB fişleri | Pi'deki USB girişlerinden yarım çıkar | Fişleri sonuna kadar it; Pi'nin USB girişlerinin önünde bir kablo bağıyla iki kabloyu birbirine topla. |
+
+**Kapatmadan önce son kontrol:** Pi'yi çalıştır, ekranın açıldığını, yönetim sayfasında **Ses** sekmesinde hoparlör ve mikrofonun göründüğünü, **Zili kutuda çal** ile sesin geldiğini gör; sonra kapağı kapatıp bir kez daha dene.
 
 ### Bağlantı özeti
 

@@ -225,6 +225,8 @@ sudo journalctl _SYSTEMD_USER_UNIT=mesajkutusu.service -n 30 --no-pager
 | "Mikrofon bulunamadı" | `wpctl status`'ta BOYA `Sources` altında görünüyor mu? USB uzatmayı çıkarıp tak. |
 | Yönetim sayfası açılmıyor | Telefon aynı Wi-Fi'de mi? `mesajkutusu.local` yerine IP dene (`hostname -I`). |
 | İlk kurulum bitmedi | Kartı Mac'e tak, `bootfs/mesajkutusu-kurulum.log`'a bak. "İnternet yok" ise Wi-Fi bilgileri eksik. |
+| Ekran ara ara kararıyor ya da hiç açılmıyor | Büyük olasılıkla ekran beslemesi (pin 4/6) ya da şerit kablo gevşek: [donanım › 3.9 Kablo düzeni](../donanim/README.md#39-kablo-düzeni-kablolar-yerinden-çıkmasın) |
+| Mikrofon ara ara kayboluyor | Mikrofon ile USB uzatmanın birleşimi gevşek: birleşimi bantla ([donanım › 3.9](../donanim/README.md#39-kablo-düzeni-kablolar-yerinden-çıkmasın)) |
 | Sunucu hiç çalışmıyor | `systemctl --user status mesajkutusu` |
 
 ---
