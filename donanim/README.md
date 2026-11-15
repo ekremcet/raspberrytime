@@ -48,7 +48,7 @@ Dosyalar: [`stl/`](stl/)
 |---|---|---|---|
 | `deneme_parcasi.stl` | 94 × 85 × 32 | Ön yüz | **İlk bunu bas.** Kamera penceresi, mikrofon kabı ve hoparlör yuvasından 3 küçük parça (~24 cm³) |
 | `on_cerceve.stl` | 210 × 203 × 32 | Ön yüz | Ekran yuvası, kamera, mikrofon kabı, hoparlör yuvası bu parçada |
-| `arka_kapak.stl` | 210 × 203 × 47 | Arka yüz | Havalandırma, güç kablosu deliği, dayama kolonları |
+| `arka_kapak.stl` | 210 × 203 × 47 | Arka yüz | Havalandırma, güç kablosu deliği, dayama kolonları, Ø10 vida kanalları (v8) |
 | `stant.stl` | 123 × 82 × 140 | Yan profil yüzü | STL zaten doğru yönde |
 
 **Dilimleyici ayarları** (Bambu Studio + Bambu Lab H2D ile denendi, diğer yazıcılarda da aynı mantık):
@@ -115,6 +115,7 @@ Pin 1, GPIO başlığında SD karta en yakın köşedeki pindir; pin 2 ve 4 kart
 
 1. Ön çerçeveyi yüzüstü (ön yüzü masaya bakacak şekilde) koy.
 2. Ekranı camı aşağıda olacak şekilde yuvaya yerleştir. Yuvada her yönde 0.5 mm boşluk var; zorlamadan oturmalı.
+   Sabitlemenin en kolay yolu: ekranın **metal arka çerçevesinin** kenarlarına, yuvanın duvarına değecek şekilde birkaç nokta yapıştırıcı (sıcak silikon ya da yapıştırıcı kalem). Camın görüntü alanına ve şerit kablolara yapıştırıcı sürme. Böylece köpük bant gerekmez.
 3. Kabloların yuva duvarındaki çentiklerden rahatça geçtiğini kontrol et. Görüntü açılışta ters gelirse sorun değil, yazılımdan döndürülür ([yazılım › 5](../yazilim/README.md#5-ekran-yönü)).
 
 ### 3.6 Hoparlör
@@ -134,11 +135,13 @@ Pin 1, GPIO başlığında SD karta en yakın köşedeki pindir; pin 2 ve 4 kart
 
 ### 3.8 Kapat
 
-1. Arka kapaktaki 4 dayama kolonunun uçlarına köpük bant yapıştır. Üstteki iki kolon ekrana değmiyorsa 2–3 kat üst üste yapıştır.
-2. Hoparlörün arkasına da bir parça köpük bant yapıştır (arka kapaktaki kolon oraya basar).
+1. Ekranı yapıştırdıysan arka kapaktaki 4 dayama kolonu yalnızca güvenlik içindir, köpük gerekmez. Yapıştırmadıysan kolon uçlarına 1–2 kat köpük bant yapıştır.
+2. Hoparlörü yuvadaki kaburgalar tutar; arka kapaktaki kolon arkadan ayrıca destekler (köpük isteğe bağlı).
 3. Güç kablosunu arka kapağın sağ yanındaki delikten geçirip Pi'ye tak.
-4. Arka kapağı 4 × M3 × 20 vidayla kapat. Vidalar plastiğe diş açar; sıkıca ama zorlamadan sık.
-5. Cihazı standa oturt; istersen 2 × M3 × 12 vidayla sabitle. Stantın altına kauçuk ayakları yapıştır.
+4. Arka kapağı 4 × M3 × 20 vidayla kapat. Vidayı arka yüzdeki köşe deliğine bırak, tornavidayı Ø10 kanaldan aşağı indir: vida başı kanalın dibinde, arka yüzden ~36 mm içeride oturur. Vidalar plastiğe diş açar; sıkıca ama zorlamadan sık. Sapı en az 50 mm olan orta boy yıldız (PH1/PH2) ya da altıgen uçlu tornavida yeterli.
+5. Cihazı standa oturt; istersen 2 × M3 × 12 vidayla sabitle: vidayı stantın arkasındaki Ø11 kanaldan sok ve tornavidayla kanal boyunca sık. Stantın altına kauçuk ayakları yapıştır.
+
+![Vida erişimi](gorseller/vida_erisimi.png)
 
 ### Bağlantı özeti
 
@@ -192,6 +195,7 @@ Arka kapak ve stant, ön çerçevedeki değişikliklerden etkilenmez; `W`/`H` (d
 
 ## 6. Sürüm geçmişi
 
+- **v8** – Tornavida erişimi: arka kapak vida kanalları Ø6.6 → Ø10 ve arka yüzde giriş hunisi; stant vida kanalları Ø6.8 → Ø11 (baskıda damla biçimli). Ön çerçeve değişmedi. Ekran köpük yerine yapıştırıcıyla sabitlenebilir.
 - **v7** – Mikrofon kelepçesi yerine süngerli kafayı saran arkadan geçmeli kap. Hoparlör yuvası hap biçimi, 12 mm duvar, ezilme kaburgaları. Deneme parçası.
 - **v6** – Kamera penceresi 4.9 mm aşağı (lens merkezi üst kenardan ölçüldü), Ø13.
 - **v5** – Ön çerçeve ilk 7" Touch Display'e göre yeniden çizildi (önceki sürümler Touch Display 2 içindi).
