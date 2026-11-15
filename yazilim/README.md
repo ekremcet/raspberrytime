@@ -85,17 +85,15 @@ Kasada ekran ters durursa görüntü baş aşağı gelir. İki yol var:
 3. **DSI-1**'e sağ tık › **Orientation › Inverted** › **Apply**. Varsa **Touchscreen** menüsünden dokunmatiği de DSI ekranına ata.
 4. `sudo reboot`. Ayar kalıcıdır.
 
-**B. Ayar dosyasından:** `~/mesajkutusu/ayarlar.env` içinde `EKRAN_DONDUR=180` yaz, sonra:
-```bash
-bash ~/mesajkutusu/sistem/kiosk.sh --dondur
-```
-Kutu her açılışta bu yönü uygular ve dokunmatiği ekrana bağlar. `EKRAN_DONDUR` boşsa sistemin kendi ayarına dokunulmaz.
+**B. Yönetim sayfasından:** **Ekran** sekmesinde **Ekran yönü**'nü **Ters (180°)** yap. Görüntü ve dokunmatik hemen döner, her açılışta da uygulanır. "Sistem ayarı" seçiliyken A yöntemindeki ayara dokunulmaz.
 
 ---
 
 ## 6. Ses
 
-Kutu varsayılan hoparlörü ve mikrofonu kullanır. Kontrol et:
+En kolayı: yönetim sayfası › **Ses** sekmesinden hoparlörü ve mikrofonu seç, seviyeleri ayarla, **Zili kutuda çal** ile dene.
+
+Komut satırından da yapılabilir. Kutu varsayılan hoparlörü ve mikrofonu kullanır. Kontrol et:
 
 ```bash
 wpctl status
@@ -136,6 +134,8 @@ Telegram kuralı gereği bot, kendisine hiç yazmamış birine mesaj gönderemez
 
 Aile üyeleri için kullanım: bota normal Telegram sesli mesajı gönderirler. Çocuğun mesajları aynı sohbete sesli not olarak düşer. Çocuk bir mesajı dinleyince gönderenin Telegram'ında o mesaja 👀 tepkisi çıkar.
 
+Sesli mesaj dışında bir şey (yazı, fotoğraf, çıkartma, video) gönderilirse bot hemen "⚠️ Bunu *çocuğun adı* göremez, yalnızca sesli mesajları görebilir" diye yanıt verir. Çocuğun adını yönetim sayfasının **Genel** sekmesinden yaz.
+
 ---
 
 ## 9. Uzaktan erişim ve güncelleme
@@ -167,43 +167,28 @@ Betik:
 3. yeni eklenen ayarları varsayılan değerleriyle `ayarlar.env`'e ekler,
 4. servisi yeniden başlatır ve ekrandaki arayüzü yeniden açar.
 
-### Ayar değiştirmek
+### Yönetim sayfasından güncelleme
 
-```bash
-nano ~/mesajkutusu/ayarlar.env          # değiştir, Ctrl+O Enter ile kaydet, Ctrl+X ile çık
-systemctl --user restart mesajkutusu
-```
-
-Ekran, sunucu güncellenince kendini yeniler.
+Depo Pi'ye bir kez alındıktan sonra (yukarıdaki `git clone`), yönetim sayfasının **Sistem** sekmesinde **Güncellemeleri denetle** → **Güncelle** ile uzak kabuğa girmeden de güncelleyebilirsin. Kutu yaklaşık bir dakika içinde yeni sürümle açılır.
 
 ---
 
 ## 10. Ayarlar
 
-`~/mesajkutusu/ayarlar.env`:
+Kurulumdan sonra **bütün ayarlar yönetim sayfasından** değiştirilir ve hemen geçerli olur; her kayıttan sonra altta yeşil **Kaydedildi** yazısı çıkar. Ayarlar cihazdaki veritabanında saklanır.
 
-| Ayar | Varsayılan | Ne işe yarar |
-|---|---|---|
-| `BOT_TOKEN` | boş | BotFather anahtarı. Boşsa **demo modu** (örnek kişilerle, Telegram'sız) |
-| `YONETICI_PIN` | rastgele | Yönetim sayfası PIN'i |
-| `KUTU_ADI` | Mesaj Kutusu | Yönetim sayfasında ve bot yanıtlarında geçen ad |
-| `MAKS_SANIYE` | 60 | En uzun kayıt süresi; dolunca kayıt kendiliğinden biter ve gider |
-| `HATIRLAT_DAKIKA` | 10 | Dinlenmemiş mesaj varken hatırlatma zili aralığı (0: kapalı) |
-| `EKRAN_DONDUR` | boş | 0/90/180/270: ekran yönü. Boşsa sistem ayarı |
-| `PORT` | 8080 | Sunucu portu |
-| `UZAKTAN_ARAYUZ` | 0 | 1: çocuk ekranı ağdaki başka cihazdan da açılır (deneme için) |
+| Sekme | Ayarlar |
+|---|---|
+| **Kişiler** | Bot durumu ve davet bağlantısı, onay bekleyenler, kişi adı, fotoğraf, renk, sıra, deneme mesajı, kaldır/engelle |
+| **Ses** | Hoparlör ve mikrofon seçimi, ses seviyesi, mikrofon seviyesi, **Zili kutuda çal** (deneme), zil açık/kapalı, zil yüksekliği, dinlenmemiş mesaj hatırlatma aralığı |
+| **Ekran** | Gündüz ve gece parlaklığı, kararma süresi (varsayılan 2 dk), kararınca saat gösterme, gece koyu teması, ekran yönü (dokunmatik de birlikte döner) |
+| **Sessiz / Gece** | Şimdi sessiz moda al / kapat, her gece otomatik sessiz (varsayılan 19:30–07:30), gece gönderene "sabah görülecek" notu |
+| **Genel** | Kutunun adı, çocuğun adı (bot uyarılarında), dil (Türkçe/English: kutu ekranı + bot mesajları), en uzun kayıt, saklanan mesaj sayısı, 👀 dinlendi tepkisi, çocuk ekranına ağdan erişim, **yönetici PIN'i**, **bot anahtarı** |
+| **Sistem** | Cihaz bilgisi (sürüm, IP, sıcaklık, disk, bellek), **güncellemeleri denetle ve kur**, uygulamayı / cihazı yeniden başlat, kapat |
 
-### Yönetim sayfasındaki ayarlar
+**Bir kerelik izin:** Parlaklık ve "Cihazı yeniden başlat / kapat" düğmeleri için Pi'de uzak kabuktan bir kez `bash ~/raspberrytime/yazilim/guncelle.sh` çalıştırıp şifreni gir. Betik yalnızca bu iki işlem için izin ekler (`/etc/sudoers.d/mesajkutusu` ve arka ışık için bir udev kuralı).
 
-Şu ayarlar dosyadan değil, yönetim sayfasının **Sessiz mod ve gece** bölümünden değiştirilir ve hemen geçerli olur:
-
-| Ayar | Varsayılan | Ne işe yarar |
-|---|---|---|
-| **Şimdi sessiz moda al** | kapalı | Sen kapatana kadar zil çalmaz, ekran yeni mesajla uyanmaz |
-| **Her gece kendiliğinden sessiz moda geç** | açık | Başlangıç–bitiş saatleri arasında otomatik sessiz + gece görünümü |
-| Başlangıç / Bitiş | 19:30 / 07:30 | Gece aralığı (gece yarısını geçebilir) |
-| **Ekran kararma** | 2 dakika | Dokunulmazsa ekran kararır ve 24 saatlik saat gösterir |
-| **"Sabah görülecek" notu** | açık | Sessizken mesaj gönderen kişiye, o sessiz dönemde bir kez kısa bilgi notu gider |
+`~/mesajkutusu/ayarlar.env` artık yalnızca başlangıç değerleri içindir (`BOT_TOKEN`, `YONETICI_PIN`, `KUTU_ADI`, `PORT`). Yönetim sayfasında değiştirilen değer dosyadakinin önüne geçer.
 
 ---
 
@@ -211,9 +196,9 @@ Ekran, sunucu güncellenince kendini yeniler.
 
 - **Ana ekran:** onaylı kişilerin fotoğrafları. Yeni mesajı olan kişinin kutucuğu turuncu parlar ve üstünde sayı rozeti çıkar; üstte "Anne sana yazdı" yazar.
 - **Kişi ekranı:** iki büyük düğme.
-  - Solda **dinle**: o kişiden gelen **son** sesli mesajı çalar, istendiği kadar tekrar dinlenir. Yeni mesajsa parlar.
+  - Solda **dinle**: dinlenmemiş mesaj varsa (örn. "3 yeni mesaj!") **hepsini eskiden yeniye sırayla** çalar ("Dinliyorsun… 2/3"); hepsi dinlendiyse yalnızca **son** mesajı çalar. Yeni mesaj varken kart parlar.
   - Sağda **mikrofon**: dokun, konuş, kareye dokun. Mesaj hemen gönderilir ve ana ekrana dönülür; altta "Anne'ye gönderildi" yazar.
-- **Zil:** yeni mesaj gelince üç notalı zil çalar, ekran uyuyorsa uyanır. Dinlenmemiş mesaj varsa `HATIRLAT_DAKIKA`'da bir hafif zil tekrar çalar.
+- **Zil:** yeni mesaj gelince üç notalı zil çalar, ekran uyuyorsa uyanır. Dinlenmemiş mesaj varsa ayarlanan aralıkta (varsayılan 10 dk) hafif bir zil tekrar çalar. Zil ve yüksekliği **Ses** sekmesinden.
 - **Ekran kararması:** varsayılan 2 dakika dokunulmazsa ekran kararır ve büyük, 24 saatlik bir **saat** ile tarih gösterir (iz kalmasın diye saat her dakika hafifçe yer değiştirir). Dokununca uyanır. Kişi ekranında en geç 2 dakika sonra ana ekrana dönülür.
 - **Sessiz mod:** zil ve hatırlatma çalmaz, yeni mesaj ekranı uyandırmaz. Mesajlar yine gelir; kutucuklar parlar, rozetler görünür, çocuk ekrana dokununca görür.
 - **Gece (varsayılan 19:30–07:30):** otomatik sessiz mod + ekran koyu ve kısık renklere geçer; karardığında saat sıcak, kısık bir renkte ve ay simgesiyle görünür.
@@ -235,7 +220,8 @@ sudo journalctl _SYSTEMD_USER_UNIT=mesajkutusu.service -n 30 --no-pager
 | Yönetim sayfasında kırmızı nokta | Sunucu yeni başladıysa ilk bağlantı birkaç saniye sürer. Kalıcıysa yukarıdaki gibi günlüğe bak. |
 | Görüntü ters | [5. Ekran yönü](#5-ekran-yönü) |
 | Dokunuşlar ters yere düşüyor | Ekran döndürülmüş ama dokunmatik bağlanmamış: 5B'deki komutu çalıştır ya da Screens › Touchscreen'den DSI'ya ata |
-| Zil / ses duyulmuyor | Yönetim sayfasında sessiz mod ya da gece modu açık mı? Değilse [6. Ses](#6-ses): hoparlör varsayılan mı, ses seviyesi kaç? |
+| Zil / ses duyulmuyor | Yönetim › **Sessiz / Gece**: sessiz mod ya da gece açık mı? Yönetim › **Ses**: doğru hoparlör seçili mi, seviye kaç? **Zili kutuda çal** ile dene. |
+| Parlaklık ya da "Cihazı yeniden başlat" çalışmıyor | Bir kerelik izin gerekli: uzak kabukta `bash ~/raspberrytime/yazilim/guncelle.sh` çalıştırıp şifreni gir. |
 | "Mikrofon bulunamadı" | `wpctl status`'ta BOYA `Sources` altında görünüyor mu? USB uzatmayı çıkarıp tak. |
 | Yönetim sayfası açılmıyor | Telefon aynı Wi-Fi'de mi? `mesajkutusu.local` yerine IP dene (`hostname -I`). |
 | İlk kurulum bitmedi | Kartı Mac'e tak, `bootfs/mesajkutusu-kurulum.log`'a bak. "İnternet yok" ise Wi-Fi bilgileri eksik. |
@@ -291,7 +277,13 @@ yazilim/
 | `GET /ws` | Canlı olaylar: yeni mesaj, bağlantı, kişi değişikliği |
 | `GET /yonetim` | Yönetim sayfası |
 | `/api/yonetim/...` | `X-Yonetici-Pin` başlığı ile: bilgi, kişiler, onay/güncelle, fotoğraf, sıra, sil, deneme |
-| `GET/POST /api/yonetim/ayarlar` | Sessiz mod, gece saatleri, ekran kararma, gece notu (veritabanında saklanır) |
+| `GET/POST /api/yonetim/ayarlar` | Tüm ayarlar (dil, zil, ekran, sessiz/gece, mesajlaşma); veritabanında saklanır |
+| `GET/POST /api/yonetim/ses` | Hoparlör/mikrofon seçimi ve seviyeleri (PipeWire `wpctl`) |
+| `POST /api/yonetim/zil` | Kutuda zili çal (deneme) |
+| `GET/POST /api/yonetim/ekran` | Parlaklık durumu, ekran yönünü uygula |
+| `GET/POST /api/yonetim/guvenlik` | PIN ve bot anahtarı |
+| `GET/POST /api/yonetim/sistem` | Cihaz bilgisi, güncelleme, yeniden başlatma, kapatma |
+| `POST /api/ekran` | Çocuk ekranı uykuya geçti/uyandı (arka ışık) |
 
 ### Elle kurulum (SD kart yöntemi yerine)
 

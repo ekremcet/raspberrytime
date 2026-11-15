@@ -24,6 +24,29 @@ kiosk_yenile() {
   fi
 }
 
+# Bir kerelik sistem izinleri: yönetim sayfasından cihazı yeniden başlatma/kapatma ve ekran parlaklığı.
+# Yalnızca uzak kabuktan (etkileşimli) çalıştırılınca şifre sorar; yönetim sayfasından güncellemede atlanır.
+sistem_izinleri() {
+  local kul sudo_dosya udev gecici
+  kul="$(id -un)"
+  sudo_dosya=/etc/sudoers.d/mesajkutusu
+  udev=/etc/udev/rules.d/90-mesajkutusu-arka-isik.rules
+  [ -f "$sudo_dosya" ] && [ -f "$udev" ] && return 0
+  if [ ! -t 0 ]; then
+    echo "    (yeniden başlatma ve parlaklık izinleri için bu betiği bir kez uzak kabuktan çalıştır)"
+    return 0
+  fi
+  echo "==> Bir kerelik izinler: yeniden başlatma/kapatma ve ekran parlaklığı (şifren istenebilir)"
+  gecici="$(mktemp)"
+  printf '%s ALL=(root) NOPASSWD: /usr/bin/systemctl reboot, /usr/bin/systemctl poweroff\n' "$kul" > "$gecici"
+  if sudo visudo -cf "$gecici" >/dev/null; then
+    sudo install -m 0440 -o root -g root "$gecici" "$sudo_dosya"
+  fi
+  rm -f "$gecici"
+  echo 'SUBSYSTEM=="backlight", ACTION=="add", RUN+="/bin/chmod 0666 /sys%p/brightness"' | sudo tee "$udev" >/dev/null
+  sudo sh -c 'chmod 0666 /sys/class/backlight/*/brightness' 2>/dev/null || true
+}
+
 ana() {
   local REPO SRC APP f satir k
   REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -48,6 +71,8 @@ ana() {
     k="${satir%%=*}"
     grep -q "^$k=" "$APP/ayarlar.env" || { echo "$satir" >> "$APP/ayarlar.env"; echo "    + $satir"; }
   done < "$SRC/ayarlar.env.ornek"
+
+  sistem_izinleri || echo "    (izinler kurulamadı, sorun değil)"
 
   echo "==> Servis yeniden başlatılıyor"
   mkdir -p "$HOME/.config/systemd/user"

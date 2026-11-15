@@ -51,6 +51,19 @@ input[type=text], input[type=password], input[type=time], select { min-height: 4
 .zaman input, .zaman select { color: var(--ink); font-size: 15px; }
 button.sessiz-acik { background: #6B4CC2; color: #fff; border-color: transparent; }
 .nokta.ay { background: #8B6FE0; }
+.sekmeler { position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; overflow-x: auto; padding: 10px 0; background: var(--bg); scrollbar-width: none; }
+.sekmeler button { flex: none; min-height: 40px; border-radius: 999px; padding: 0 14px; font-size: 14px; }
+.sekmeler button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.sekme { display: flex; flex-direction: column; gap: 20px; }
+.alan { display: flex; flex-direction: column; gap: 4px; }
+.alan > span { font-size: 13px; color: var(--muted); }
+.kaydirma { display: flex; align-items: center; gap: 12px; }
+.kaydirma input[type=range] { flex: 1; accent-color: var(--accent); height: 32px; }
+.kaydirma output { min-width: 44px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.izgara2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.bilgi-liste { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; font-size: 14px; }
+.bilgi-liste dt { color: var(--muted); } .bilgi-liste dd { margin: 0; font-weight: 600; }
+pre.kayit { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px; font-size: 12px; white-space: pre-wrap; margin: 0; max-height: 220px; overflow: auto; }
 .kayit-durum { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 10; display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 999px; font-weight: 700; font-size: 14px; background: var(--ink); color: var(--bg); box-shadow: 0 8px 24px rgba(0,0,0,.25); }
 .kayit-durum.tamam { background: #2E9E5B; color: #fff; }
 .kayit-durum.hata { background: var(--danger); color: #fff; }
@@ -73,44 +86,172 @@ button.sessiz-acik { background: #6B4CC2; color: #fff; border-color: transparent
     <p class="not" id="pinHata" hidden>PIN hatalı.</p>
   </section>
 
-  <div id="icerik" hidden style="display:flex;flex-direction:column;gap:20px">
-    <section class="kart bilgi" id="bilgiKart">
-      <h2>Bot</h2>
-      <div class="durum"><i class="nokta" id="nokta"></i><span id="durumYazi"></span></div>
-      <div id="botAlan"></div>
-    </section>
+  <div id="icerik" hidden style="display:flex;flex-direction:column;gap:12px">
+    <nav class="sekmeler" role="tablist" id="sekmeler">
+      <button role="tab" data-sekme="kisiler">Kişiler</button>
+      <button role="tab" data-sekme="ses">Ses</button>
+      <button role="tab" data-sekme="ekran">Ekran</button>
+      <button role="tab" data-sekme="gece">Sessiz / Gece</button>
+      <button role="tab" data-sekme="genel">Genel</button>
+      <button role="tab" data-sekme="sistem">Sistem</button>
+    </nav>
 
-    <section class="kart bilgi" id="sessizKart">
-      <h2>Sessiz mod ve gece</h2>
-      <div class="durum"><i class="nokta" id="sNokta"></i><span id="sDurum"></span></div>
-      <div class="satir"><button class="ana" id="sessizDugme" type="button">Şimdi sessiz moda al</button></div>
-      <label class="secim"><input type="checkbox" id="geceOto"> Her gece kendiliğinden sessiz moda geç</label>
-      <div class="satir">
-        <label class="zaman">Başlangıç<input type="time" id="geceBas" step="300"></label>
-        <label class="zaman">Bitiş (sabah)<input type="time" id="geceBit" step="300"></label>
-        <label class="zaman">Ekran kararma<select id="uykuDk">
-          <option value="1">1 dakika</option><option value="2">2 dakika</option><option value="3">3 dakika</option>
-          <option value="5">5 dakika</option><option value="10">10 dakika</option><option value="30">30 dakika</option></select></label>
-      </div>
-      <label class="secim"><input type="checkbox" id="geceYanit"> Sessizken mesaj gönderen kişiye "sabah görülecek" notu gönder (dönem başına bir kez)</label>
-      <p class="kucuk" style="margin:0">Sessiz modda mesajlar yine gelir ve saklanır; zil çalmaz, ekran uyanmaz. Kutucuklar yine parlar, çocuk sabah görür. Gece saatlerinde ekran koyu renklere geçer ve kararınca kısık bir saat gösterir.</p>
-    </section>
+    <!-- KİŞİLER -->
+    <div class="sekme" data-sekme="kisiler">
+      <section class="kart bilgi" id="bilgiKart">
+        <h2>Bot</h2>
+        <div class="durum"><i class="nokta" id="nokta"></i><span id="durumYazi"></span></div>
+        <div id="botAlan"></div>
+      </section>
+      <section class="kart" id="bekleyenKart" hidden>
+        <h2>Onay bekleyenler</h2>
+        <div id="bekleyenler"></div>
+      </section>
+      <section class="kart">
+        <h2>Kutudaki kişiler</h2>
+        <p class="kucuk" style="margin:0 0 6px">Değişiklikler otomatik kaydedilir ve kutunun ekranına hemen yansır. Her kayıttan sonra altta yeşil <b>Kaydedildi</b> yazısı çıkar.</p>
+        <div id="kisiler"></div>
+      </section>
+      <section class="kart" id="engelliKart" hidden>
+        <h2>Engellenenler</h2>
+        <div id="engelliler"></div>
+      </section>
+    </div>
 
-    <section class="kart" id="bekleyenKart" hidden>
-      <h2>Onay bekleyenler</h2>
-      <div id="bekleyenler"></div>
-    </section>
+    <!-- SES -->
+    <div class="sekme" data-sekme="ses" hidden>
+      <section class="kart bilgi">
+        <h2>Hoparlör</h2>
+        <p class="not" id="sesYok" hidden></p>
+        <label class="alan"><span>Hoparlör</span><select id="hoparlor"></select></label>
+        <label class="alan"><span>Ses seviyesi (mesajlar ve zil)</span>
+          <div class="kaydirma"><input type="range" id="sesSeviye" min="0" max="100" step="5"><output id="sesSeviyeYaz"></output></div></label>
+        <div class="satir"><button type="button" id="zilDene">Zili kutuda çal</button></div>
+      </section>
+      <section class="kart bilgi">
+        <h2>Mikrofon</h2>
+        <label class="alan"><span>Mikrofon</span><select id="mikrofon"></select></label>
+        <label class="alan"><span>Mikrofon seviyesi</span>
+          <div class="kaydirma"><input type="range" id="mikSeviye" min="0" max="100" step="5"><output id="mikSeviyeYaz"></output></div></label>
+      </section>
+      <section class="kart bilgi">
+        <h2>Bildirim zili</h2>
+        <label class="secim"><input type="checkbox" data-ayar="zil_acik" data-mesaj="Zil ayarı"> Yeni mesaj gelince zil çalsın</label>
+        <label class="alan"><span>Zil yüksekliği (hoparlör seviyesine göre)</span>
+          <div class="kaydirma"><input type="range" data-ayar="zil_seviye" data-mesaj="Zil yüksekliği" min="10" max="100" step="10"><output></output></div></label>
+        <label class="alan"><span>Dinlenmemiş mesaj varken hatırlatma</span>
+          <select data-ayar="hatirlat_dakika" data-mesaj="Hatırlatma">
+            <option value="0">Kapalı</option><option value="5">5 dakikada bir</option><option value="10">10 dakikada bir</option>
+            <option value="15">15 dakikada bir</option><option value="30">30 dakikada bir</option><option value="60">Saatte bir</option></select></label>
+      </section>
+    </div>
 
-    <section class="kart">
-      <h2>Kutudaki kişiler</h2>
-      <p class="kucuk" style="margin:0 0 6px">Değişiklikler otomatik kaydedilir ve kutunun ekranına hemen yansır. Her kayıttan sonra altta yeşil <b>Kaydedildi</b> yazısı çıkar.</p>
-      <div id="kisiler"></div>
-    </section>
+    <!-- EKRAN -->
+    <div class="sekme" data-sekme="ekran" hidden>
+      <section class="kart bilgi">
+        <h2>Parlaklık</h2>
+        <p class="not" id="parlaklikYok" hidden></p>
+        <label class="alan"><span>Gündüz</span>
+          <div class="kaydirma"><input type="range" data-ayar="parlaklik" data-mesaj="Parlaklık" min="5" max="100" step="5"><output></output></div></label>
+        <label class="alan"><span>Gece saatlerinde</span>
+          <div class="kaydirma"><input type="range" data-ayar="gece_parlaklik" data-mesaj="Gece parlaklığı" min="5" max="100" step="5"><output></output></div></label>
+      </section>
+      <section class="kart bilgi">
+        <h2>Uyku ve saat</h2>
+        <label class="alan"><span>Dokunulmazsa ekran kararsın</span>
+          <select data-ayar="uyku_dakika" data-mesaj="Ekran kararma süresi">
+            <option value="1">1 dakika sonra</option><option value="2">2 dakika sonra</option><option value="3">3 dakika sonra</option>
+            <option value="5">5 dakika sonra</option><option value="10">10 dakika sonra</option><option value="30">30 dakika sonra</option></select></label>
+        <label class="secim"><input type="checkbox" data-ayar="saat_goster" data-mesaj="Saat ayarı"> Ekran kararınca 24 saatlik saat göster</label>
+        <label class="secim"><input type="checkbox" data-ayar="gece_tema" data-mesaj="Gece teması"> Gece saatlerinde koyu ve kısık renkler</label>
+      </section>
+      <section class="kart bilgi">
+        <h2>Ekran yönü</h2>
+        <label class="alan"><span>Görüntü ters ya da yan geliyorsa değiştir; dokunmatik de birlikte döner</span>
+          <select data-ayar="ekran_yonu" data-mesaj="Ekran yönü">
+            <option value="">Sistem ayarı (dokunma)</option><option value="0">Normal</option><option value="180">Ters (180°)</option>
+            <option value="90">90°</option><option value="270">270°</option></select></label>
+        <p class="kucuk" id="yonSonuc" style="margin:0"></p>
+      </section>
+    </div>
 
-    <section class="kart" id="engelliKart" hidden>
-      <h2>Engellenenler</h2>
-      <div id="engelliler"></div>
-    </section>
+    <!-- SESSİZ / GECE -->
+    <div class="sekme" data-sekme="gece" hidden>
+      <section class="kart bilgi" id="sessizKart">
+        <h2>Sessiz mod ve gece</h2>
+        <div class="durum"><i class="nokta" id="sNokta"></i><span id="sDurum"></span></div>
+        <div class="satir"><button class="ana" id="sessizDugme" type="button">Şimdi sessiz moda al</button></div>
+        <label class="secim"><input type="checkbox" data-ayar="gece_otomatik" data-mesaj="Gece modu"> Her gece kendiliğinden sessiz moda geç</label>
+        <div class="satir">
+          <label class="zaman">Başlangıç<input type="time" data-ayar="gece_baslangic" data-mesaj="Başlangıç saati" step="300"></label>
+          <label class="zaman">Bitiş (sabah)<input type="time" data-ayar="gece_bitis" data-mesaj="Bitiş saati" step="300"></label>
+        </div>
+        <label class="secim"><input type="checkbox" data-ayar="gece_yanit" data-mesaj="Gece notu"> Sessizken mesaj gönderen kişiye "sabah görülecek" notu gönder (dönem başına bir kez)</label>
+        <p class="kucuk" style="margin:0">Sessiz modda mesajlar yine gelir ve saklanır; zil çalmaz, ekran uyanmaz. Kutucuklar yine parlar, çocuk sabah görür.</p>
+      </section>
+    </div>
+
+    <!-- GENEL -->
+    <div class="sekme" data-sekme="genel" hidden>
+      <section class="kart bilgi">
+        <h2>Kutu</h2>
+        <div class="izgara2">
+          <label class="alan"><span>Kutunun adı (yönetimde ve bot mesajlarında)</span><input type="text" data-ayar="kutu_adi" data-mesaj="Kutu adı" maxlength="40"></label>
+          <label class="alan"><span>Çocuğun adı (bot uyarılarında: "Bunu … göremez")</span><input type="text" data-ayar="cocuk_adi" data-mesaj="Çocuğun adı" maxlength="30"></label>
+          <label class="alan"><span>Dil (kutunun ekranı ve bot mesajları)</span>
+            <select data-ayar="dil" data-mesaj="Dil"><option value="tr">Türkçe</option><option value="en">English</option></select></label>
+          <label class="alan"><span>En uzun kayıt</span>
+            <select data-ayar="maks_saniye" data-mesaj="En uzun kayıt">
+              <option value="30">30 saniye</option><option value="60">1 dakika</option><option value="90">1,5 dakika</option>
+              <option value="120">2 dakika</option><option value="180">3 dakika</option><option value="300">5 dakika</option></select></label>
+          <label class="alan"><span>Kişi başına saklanan mesaj</span>
+            <select data-ayar="saklanan_mesaj" data-mesaj="Saklanan mesaj sayısı">
+              <option value="20">Son 20</option><option value="40">Son 40</option><option value="100">Son 100</option><option value="200">Son 200</option></select></label>
+        </div>
+        <label class="secim"><input type="checkbox" data-ayar="dinlendi_tepki" data-mesaj="Dinlendi tepkisi"> Çocuk bir mesajı dinleyince gönderenin Telegram'ında 👀 tepkisi çıksın</label>
+        <label class="secim"><input type="checkbox" data-ayar="uzaktan_arayuz" data-mesaj="Uzaktan arayüz"> Çocuk ekranı ev ağındaki başka cihazlardan da açılabilsin (deneme için)</label>
+      </section>
+      <section class="kart bilgi">
+        <h2>Yönetici PIN'i</h2>
+        <p class="kucuk" style="margin:0" id="pinKaynak"></p>
+        <form class="satir" id="pinDegis">
+          <input type="password" id="yeniPin" inputmode="numeric" autocomplete="new-password" placeholder="Yeni PIN (4–12 rakam)" style="flex:1;min-width:160px">
+          <button type="submit">PIN'i değiştir</button>
+        </form>
+      </section>
+      <section class="kart bilgi">
+        <h2>Telegram bot anahtarı</h2>
+        <p class="kucuk" style="margin:0" id="tokenDurum"></p>
+        <form class="satir" id="tokenDegis">
+          <input type="password" id="yeniToken" autocomplete="off" placeholder="123456789:AAH..." style="flex:1;min-width:200px">
+          <button type="submit">Anahtarı değiştir</button>
+        </form>
+        <p class="kucuk" style="margin:0">Yeni anahtar önce Telegram'da denenir; geçerliyse kaydedilir ve uygulama yeniden başlar. Onaylı kişiler yeni bota bir kez daha <b>Başlat</b> demelidir.</p>
+      </section>
+    </div>
+
+    <!-- SİSTEM -->
+    <div class="sekme" data-sekme="sistem" hidden>
+      <section class="kart bilgi">
+        <h2>Cihaz</h2>
+        <dl class="bilgi-liste" id="sistemBilgi"></dl>
+      </section>
+      <section class="kart bilgi">
+        <h2>Güncelleme</h2>
+        <p class="kucuk" style="margin:0" id="guncelDurum"></p>
+        <div class="satir"><button type="button" id="denetle">Güncellemeleri denetle</button><button type="button" class="ana" id="guncelle" hidden>Güncelle</button></div>
+        <pre class="kayit" id="guncelKayit" hidden></pre>
+      </section>
+      <section class="kart bilgi">
+        <h2>Yeniden başlat</h2>
+        <div class="satir">
+          <button type="button" data-sistem="uygulama">Uygulamayı yeniden başlat</button>
+          <button type="button" data-sistem="yeniden_baslat">Cihazı yeniden başlat</button>
+          <button type="button" class="tehlike" data-sistem="kapat">Cihazı kapat</button>
+        </div>
+        <p class="kucuk" style="margin:0">Kapatırsan yeniden açmak için güç kablosunu çıkarıp takman gerekir.</p>
+      </section>
+    </div>
   </div>
 </main>
 <input type="file" id="dosya" accept="image/*" hidden>
@@ -153,35 +294,131 @@ async function yukle() {
   const k = $("kopyala"); if (k) k.onclick = async () => { try { await navigator.clipboard.writeText(b.baglanti); k.textContent = "Kopyalandı"; } catch (e) { getSelection().selectAllChildren($("link")); } };
   KISILER = ks; ciz();
   ayarlariCiz(await api("/api/yonetim/ayarlar"));
+  if (!document.querySelector('#sekmeler [aria-selected="true"]')) { let s = "kisiler"; try { s = sessionStorage.getItem("kutu-sekme") || s; } catch (e) {} sekmeAc(s); }
 }
 
-/* ---------- sessiz mod ve gece ---------- */
+/* ---------- sekmeler ---------- */
+function sekmeAc(ad) {
+  document.querySelectorAll("#sekmeler button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.sekme === ad)));
+  document.querySelectorAll(".sekme").forEach(d => d.hidden = d.dataset.sekme !== ad);
+  try { sessionStorage.setItem("kutu-sekme", ad); } catch (e) {}
+  if (ad === "ses") sesYukle(); if (ad === "ekran") ekranYukle(); if (ad === "genel") guvenlikYukle(); if (ad === "sistem") sistemYukle();
+}
+$("sekmeler").addEventListener("click", e => { const b = e.target.closest("[data-sekme]"); if (b) sekmeAc(b.dataset.sekme); });
+
+/* ---------- ayarlar (data-ayar ile bağlı tüm alanlar) ---------- */
 let AYAR = {};
+function ayarDegeri(el) { return el.type === "checkbox" ? (el.checked ? "1" : "0") : el.value; }
 function ayarlariCiz(a) {
-  AYAR = a; const elle = a.sessiz_elle === "1", oto = a.gece_otomatik === "1";
+  AYAR = a;
+  document.querySelectorAll("[data-ayar]").forEach(el => {
+    if (document.activeElement === el) return;
+    const v = a[el.dataset.ayar]; if (v === undefined) return;
+    if (el.type === "checkbox") el.checked = v === "1";
+    else { if (el.tagName === "SELECT" && ![...el.options].some(o => o.value === String(v))) el.add(new Option(String(v), String(v))); el.value = v; }
+    const out = el.parentElement.querySelector("output"); if (out) out.textContent = "%" + el.value;
+  });
+  const elle = a.sessiz_elle === "1", oto = a.gece_otomatik === "1";
   $("sNokta").className = "nokta" + (a.simdi_sessiz ? " ay" : "");
   $("sDurum").textContent = a.simdi_sessiz
     ? (elle ? "Sessiz mod açık (sen kapatana kadar)" : `Gece modu: ${a.gece_bitis}'e kadar sessiz`)
     : "Bildirimler açık" + (oto ? ` · her gece ${a.gece_baslangic}–${a.gece_bitis} sessiz` : "");
   const d = $("sessizDugme"); d.textContent = elle ? "Sessiz modu kapat" : "Şimdi sessiz moda al"; d.classList.toggle("sessiz-acik", elle);
-  if (document.activeElement !== $("geceBas")) $("geceBas").value = a.gece_baslangic;
-  if (document.activeElement !== $("geceBit")) $("geceBit").value = a.gece_bitis;
-  $("geceOto").checked = oto; $("geceBas").disabled = $("geceBit").disabled = !oto;
-  $("geceYanit").checked = a.gece_yanit === "1";
-  const u = String(+a.uyku_dakika); if (![...$("uykuDk").options].some(o => o.value === u)) $("uykuDk").add(new Option(u + " dakika", u)); $("uykuDk").value = u;
+  document.querySelectorAll('[data-ayar="gece_baslangic"],[data-ayar="gece_bitis"]').forEach(x => x.disabled = !oto);
 }
 async function ayarKaydet(veri, yazi) {
-  await kaydet(async () => ayarlariCiz(await api("/api/yonetim/ayarlar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(veri) })), yazi).catch(() => ayarlariCiz(AYAR));
+  try { ayarlariCiz(await kaydet(() => api("/api/yonetim/ayarlar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(veri) }), yazi)); }
+  catch (e) { ayarlariCiz(AYAR); }
 }
+document.addEventListener("change", e => {
+  const el = e.target.closest("[data-ayar]"); if (!el) return;
+  if (el.type === "time" && !el.value) return;
+  ayarKaydet({ [el.dataset.ayar]: ayarDegeri(el) }, "✓ " + (el.dataset.mesaj || "Ayar") + " kaydedildi")
+    .then(() => { if (el.dataset.ayar === "ekran_yonu") $("yonSonuc").textContent = "Ekrana uygulandı. Dokunuşlar ters yere düşüyorsa bir kez cihazı yeniden başlat."; });
+});
+document.addEventListener("input", e => {
+  if (e.target.type !== "range") return; const out = e.target.parentElement.querySelector("output"); if (out) out.textContent = "%" + e.target.value;
+});
 $("sessizDugme").addEventListener("click", () => {
   const ac = AYAR.sessiz_elle !== "1";
   ayarKaydet({ sessiz_elle: ac ? 1 : 0 }, ac ? "✓ Sessiz mod açıldı" : "✓ Sessiz mod kapatıldı");
 });
-$("geceOto").addEventListener("change", e => ayarKaydet({ gece_otomatik: e.target.checked ? 1 : 0 }, e.target.checked ? "✓ Gece modu açıldı" : "✓ Gece modu kapatıldı"));
-$("geceBas").addEventListener("change", e => e.target.value && ayarKaydet({ gece_baslangic: e.target.value }, "✓ Başlangıç saati kaydedildi"));
-$("geceBit").addEventListener("change", e => e.target.value && ayarKaydet({ gece_bitis: e.target.value }, "✓ Bitiş saati kaydedildi"));
-$("uykuDk").addEventListener("change", e => ayarKaydet({ uyku_dakika: e.target.value }, "✓ Ekran kararma süresi kaydedildi"));
-$("geceYanit").addEventListener("change", e => ayarKaydet({ gece_yanit: e.target.checked ? 1 : 0 }, "✓ Kaydedildi"));
+
+/* ---------- ses ---------- */
+function sesCiz(d) {
+  $("sesYok").hidden = d.var; $("sesYok").textContent = d.hata || "";
+  const sec = (el, liste, secili) => { el.innerHTML = (liste || []).map(c => `<option value="${c.id}">${esc(c.ad)}</option>`).join("") || "<option>Bulunamadı</option>"; if (secili != null) el.value = secili; };
+  sec($("hoparlor"), d.hoparlorler, d.hoparlor); sec($("mikrofon"), d.mikrofonlar, d.mikrofon);
+  if (d.ses != null) { $("sesSeviye").value = d.ses; $("sesSeviyeYaz").textContent = "%" + d.ses; }
+  if (d.mik_ses != null) { $("mikSeviye").value = d.mik_ses; $("mikSeviyeYaz").textContent = "%" + d.mik_ses; }
+}
+async function sesYukle() { try { sesCiz(await api("/api/yonetim/ses")); } catch (e) {} }
+async function sesKaydet(veri, yazi) { try { sesCiz(await kaydet(() => api("/api/yonetim/ses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(veri) }), yazi)); } catch (e) { sesYukle(); } }
+$("hoparlor").addEventListener("change", e => sesKaydet({ hoparlor: +e.target.value }, "✓ Hoparlör seçildi"));
+$("mikrofon").addEventListener("change", e => sesKaydet({ mikrofon: +e.target.value }, "✓ Mikrofon seçildi"));
+$("sesSeviye").addEventListener("input", e => $("sesSeviyeYaz").textContent = "%" + e.target.value);
+$("mikSeviye").addEventListener("input", e => $("mikSeviyeYaz").textContent = "%" + e.target.value);
+$("sesSeviye").addEventListener("change", e => sesKaydet({ ses: +e.target.value }, "✓ Ses seviyesi kaydedildi"));
+$("mikSeviye").addEventListener("change", e => sesKaydet({ mik_ses: +e.target.value }, "✓ Mikrofon seviyesi kaydedildi"));
+$("zilDene").addEventListener("click", () => kaydet(() => api("/api/yonetim/zil", { method: "POST" }), "✓ Zil kutuda çalındı").catch(() => {}));
+
+/* ---------- ekran ---------- */
+async function ekranYukle() {
+  try {
+    const d = await api("/api/yonetim/ekran"), n = $("parlaklikYok");
+    n.hidden = d.var && d.yazilabilir;
+    n.textContent = !d.var ? "Bu ekranda parlaklık ayarı bulunamadı." : "Parlaklığı değiştirmek için izin gerekiyor: Pi'de uzak kabuktan bir kez 'bash ~/raspberrytime/yazilim/guncelle.sh' çalıştırıp şifreni gir.";
+  } catch (e) {}
+}
+
+/* ---------- güvenlik ---------- */
+async function guvenlikYukle() {
+  try {
+    const g = await api("/api/yonetim/guvenlik");
+    $("pinKaynak").textContent = { panel: "PIN bu sayfadan belirlendi.", dosya: "PIN ayarlar.env dosyasından geliyor.", otomatik: "PIN otomatik üretildi." }[g.pin_kaynak] || "";
+    $("tokenDurum").textContent = g.token_var ? `Kayıtlı anahtar: ${g.token_maske} (${g.token_kaynak === "panel" ? "bu sayfadan" : "ayarlar.env'den"})` : "Anahtar yok: kutu demo modunda.";
+  } catch (e) {}
+}
+$("pinDegis").addEventListener("submit", async e => {
+  e.preventDefault(); const yeni = $("yeniPin").value.trim();
+  try { await kaydet(() => api("/api/yonetim/guvenlik", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin: yeni }) }), "✓ PIN değiştirildi");
+        PIN = yeni; try { sessionStorage.setItem("kutu-pin", PIN); } catch (e2) {} $("yeniPin").value = ""; guvenlikYukle(); } catch (err) {}
+});
+$("tokenDegis").addEventListener("submit", async e => {
+  e.preventDefault(); const tok = $("yeniToken").value.trim(); if (!tok) return;
+  try { await kaydet(() => api("/api/yonetim/guvenlik", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ bot_token: tok }) }), "✓ Anahtar kaydedildi, uygulama yeniden başlıyor…");
+        $("yeniToken").value = ""; setTimeout(() => yukle().catch(() => {}), 8000); } catch (err) {}
+});
+
+/* ---------- sistem ---------- */
+const sureYaz = sn => { const g = Math.floor(sn / 86400), s = Math.floor(sn % 86400 / 3600), d = Math.floor(sn % 3600 / 60); return (g ? g + " gün " : "") + (s ? s + " saat " : "") + d + " dk"; };
+function sistemCiz(d) {
+  const satir = (a, b) => b == null || b === "" ? "" : `<dt>${a}</dt><dd>${esc(b)}</dd>`;
+  $("sistemBilgi").innerHTML = satir("Cihaz", d.ad) + satir("Adres", (d.ip || []).join(", ")) +
+    satir("Sürüm", d.surum ? `${d.surum} · ${d.surum_tarih} · ${d.surum_not}` : (d.depo ? "" : "GitHub deposu yok")) +
+    satir("Sıcaklık", d.sicaklik != null ? d.sicaklik + " °C" : null) + satir("Açık kalma", d.acik_sure != null ? sureYaz(d.acik_sure) : null) +
+    satir("Disk", `${d.disk_bos} GB boş / ${d.disk_toplam} GB`) + satir("Bellek", d.bellek_toplam ? `${d.bellek_bos} GB boş / ${d.bellek_toplam} GB` : null);
+  $("guncelKayit").hidden = !d.guncelleme_log; $("guncelKayit").textContent = d.guncelleme_log || "";
+}
+async function sistemYukle() { try { sistemCiz(await api("/api/yonetim/sistem")); } catch (e) {} }
+async function sistemIslem(islem, yazi) { return kaydet(() => api("/api/yonetim/sistem", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ islem }) }), yazi); }
+$("denetle").addEventListener("click", async () => {
+  $("guncelDurum").textContent = "Denetleniyor…";
+  try { const d = await sistemIslem("denetle", "✓ Denetlendi"); sistemCiz(d);
+        $("guncelle").hidden = !d.yeniler.length;
+        $("guncelDurum").textContent = d.yeniler.length ? `${d.yeniler.length} yeni değişiklik: ${d.yeniler.slice(0, 5).join(" · ")}` : "Kutu güncel."; }
+  catch (e) { $("guncelDurum").textContent = ""; }
+});
+$("guncelle").addEventListener("click", async () => {
+  try { const r = await sistemIslem("guncelle", "✓ Güncelleme başladı"); $("guncelDurum").textContent = r.mesaj; $("guncelle").hidden = true;
+        setTimeout(() => location.reload(), 45000); } catch (e) {}
+});
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-sistem]"); if (!b) return;
+  if (b.dataset.onay !== "1") { const eski = b.textContent; b.dataset.onay = "1"; b.textContent = "Emin misin? Tekrar dokun"; setTimeout(() => { b.dataset.onay = ""; b.textContent = eski; }, 3000); return; }
+  b.dataset.onay = "";
+  try { const r = await sistemIslem(b.dataset.sistem, "✓ Tamam"); kayitDurum("tamam", "✓ " + r.mesaj); } catch (err) {}
+});
 
 function fotoHTML(k) { return k.foto ? `<img src="/medya/${esc(k.foto)}" alt="">` : SILUET; }
 function ciz() {

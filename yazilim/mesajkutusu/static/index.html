@@ -117,20 +117,20 @@ body.gece .hap { background: #2A2416; color: #E9C98A; }
 <body>
 <section class="ekran" id="ana">
   <div class="ust">
-    <h1>Kime mesaj gönderelim?</h1>
+    <h1 data-t="baslik">Kime mesaj gönderelim?</h1>
     <div class="hap" id="hap" hidden>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
       <span id="hapYazi"></span>
     </div>
   </div>
   <div class="izgara" id="izgara"></div>
-  <div class="bos" id="bos" hidden><b>Henüz kimse eklenmedi</b><span>Kişileri yönetim sayfasından ekleyin: <span id="yonetimAdres"></span></span></div>
+  <div class="bos" id="bos" hidden><b data-t="bos_baslik">Henüz kimse eklenmedi</b><span><span data-t="bos_alt">Kişileri yönetim sayfasından ekleyin:</span> <span id="yonetimAdres"></span></span></div>
 </section>
 
 <section class="ekran" id="kisi" hidden>
   <div class="ust">
     <div class="baslik">
-      <button class="geri" id="geri" aria-label="Kişilere dön"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <button class="geri" id="geri" data-t-aria="geri" aria-label="Kişilere dön"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
       <div class="avatar" id="kAvatar"></div>
       <h1 id="kAd"></h1>
     </div>
@@ -144,15 +144,15 @@ body.gece .hap { background: #2A2416; color: #E9C98A; }
     <div class="panel" id="panel">
       <div id="pBos">
         <div style="display:flex;flex-direction:column;align-items:center;gap:3vh">
-          <button class="mik" id="mik" aria-label="Kaydı başlat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="12" rx="3" fill="currentColor"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3.5"/></svg></button>
-          <span class="etiket" id="mikYazi">Konuşmak için dokun</span>
+          <button class="mik" id="mik" data-t-aria="kayit_basla" aria-label="Kaydı başlat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="12" rx="3" fill="currentColor"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3.5"/></svg></button>
+          <span class="etiket" id="mikYazi" data-t="konus">Konuşmak için dokun</span>
         </div>
       </div>
       <div id="pKayit" hidden style="display:flex;flex-direction:column;align-items:center;gap:2.6vh">
-        <button class="mik" id="dur" aria-label="Kaydı bitir ve gönder"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="3"/></svg></button>
+        <button class="mik" id="dur" data-t-aria="kayit_bitir" aria-label="Kaydı bitir ve gönder"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="3"/></svg></button>
         <div class="canli" id="canli"></div>
         <span class="sayac" id="sayac">0:00</span>
-        <span class="etiket" style="color:#7A1E22">Bitirince dokun</span>
+        <span class="etiket" style="color:#7A1E22" data-t="bitirince">Bitirince dokun</span>
       </div>
       <div id="pHata" hidden style="display:flex;flex-direction:column;align-items:center;gap:2vh;text-align:center">
         <span class="etiket" style="color:#7A1E22" id="hataYazi">Olmadı, bir daha dene</span>
@@ -178,10 +178,39 @@ const IK = {
   hata: '<svg class="durum-ik hata" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><path d="M12 16.5v.01"/></svg>',
   tamam: '<svg class="durum-ik tamam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
 };
-let D = { kisiler: [], maks_saniye: 60, uyku_dakika: 2, sessiz: false, gece: false, cevrimici: true };
+let D = { kisiler: [], maks_saniye: 60, uyku_dakika: 2, sessiz: false, gece: false, cevrimici: true, dil: "tr", zil_acik: true, zil_seviye: 80, saat_goster: true };
+const METIN = {
+  tr: { baslik: "Kime mesaj gönderelim?", bos_baslik: "Henüz kimse eklenmedi", bos_alt: "Kişileri yönetim sayfasından ekleyin:",
+        geri: "Kişilere dön", kayit_basla: "Kaydı başlat", kayit_bitir: "Kaydı bitir ve gönder", konus: "Konuşmak için dokun",
+        bitirince: "Bitirince dokun", dinle: "Son mesajı dinle", durdur: "Durdur", mesaj_yok: "Henüz mesaj yok",
+        dinliyorsun: "Dinliyorsun…", yeni: "Yeni mesaj!", yeniler: "{n} yeni mesaj!", tekrar: "Tekrar dinle",
+        yazdi: "{adlar} sana yazdı", ve: " ve ", gonderildi: ad => ek(ad) + " gönderildi", gonderilemedi: "Gönderilemedi, bir daha dene",
+        mik_yok: "Mikrofon bulunamadı", kisa: "Çok kısa oldu, bir daha dene", internet: "İnternet yok, mesajlar sonra gidecek",
+        anahtar: "Bot anahtarı hatalı", yeni_mesaj: "yeni mesaj",
+        gunler: ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"],
+        aylar: ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"],
+        tarih: (g, d, a) => `${g}, ${d} ${a}` },
+  en: { baslik: "Who do you want to talk to?", bos_baslik: "No one added yet", bos_alt: "Add people from the admin page:",
+        geri: "Back to people", kayit_basla: "Start recording", kayit_bitir: "Finish and send", konus: "Tap to talk",
+        bitirince: "Tap when done", dinle: "Play last message", durdur: "Stop", mesaj_yok: "No messages yet",
+        dinliyorsun: "Listening…", yeni: "New message!", yeniler: "{n} new messages!", tekrar: "Play again",
+        yazdi: "{adlar} sent you a message", ve: " and ", gonderildi: ad => "Sent to " + ad, gonderilemedi: "Couldn't send, try again",
+        mik_yok: "No microphone found", kisa: "Too short, try again", internet: "No internet, messages will be sent later",
+        anahtar: "Bot key is wrong", yeni_mesaj: "new messages",
+        gunler: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+        aylar: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+        tarih: (g, d, a) => `${g}, ${a} ${d}` },
+};
+const t = (k, v = {}) => { const x = (METIN[D.dil] || METIN.tr)[k]; return typeof x === "string" ? x.replace(/\{(\w+)\}/g, (_, a) => v[a]) : x; };
+let sonDil = null;
+function metinleriUygula() {
+  if (D.dil === sonDil) return; sonDil = D.dil; document.documentElement.lang = D.dil;
+  document.querySelectorAll("[data-t]").forEach(e => e.textContent = t(e.dataset.t));
+  document.querySelectorAll("[data-t-aria]").forEach(e => e.setAttribute("aria-label", t(e.dataset.tAria)));
+}
 function baglantiGoster() {
   $("baglanti").hidden = D.cevrimici || D.demo;
-  $("baglantiYazi").textContent = D.neden === "anahtar" ? "Bot anahtarı hatalı (ayarlar.env)" : "İnternet yok, mesajlar sonra gidecek";
+  $("baglantiYazi").textContent = D.neden === "anahtar" ? t("anahtar") : t("internet");
 }
 let simdiki = null, mod = "bos", caliyorId = null;
 const kisiBul = id => D.kisiler.find(k => k.id === id);
@@ -195,6 +224,7 @@ async function durumAl() {
   const r = await fetch("/api/durum"); D = await r.json();
   if (window.ilkSurum && D.surum && D.surum !== window.ilkSurum) { location.reload(); return; }
   window.ilkSurum = window.ilkSurum || D.surum;
+  metinleriUygula(); sonListe = ""; if (simdiki) dinleCiz(); saatCiz();
   baglantiGoster();
   if (simdiki && !kisiBul(simdiki)) anaya();
   ciz();
@@ -211,10 +241,10 @@ function ciz() {
   $("bos").hidden = ks.length > 0; iz.hidden = ks.length === 0;
   $("yonetimAdres").textContent = location.host.replace("localhost", "<cihaz-adresi>") + "/yonetim";
   const n = ks.length; iz.style.setProperty("--sutun", n <= 3 ? Math.max(1, n) : n === 4 ? 2 : 3);
-  iz.innerHTML = ks.map(k => `<button class="kutucuk${k.okunmamis ? " yeni" : ""}" data-id="${k.id}" style="--renk:${k.renk}" aria-label="${k.ad}${k.okunmamis ? ", " + k.okunmamis + " yeni mesaj" : ""}">
+  iz.innerHTML = ks.map(k => `<button class="kutucuk${k.okunmamis ? " yeni" : ""}" data-id="${k.id}" style="--renk:${k.renk}" aria-label="${k.ad}${k.okunmamis ? ", " + k.okunmamis + " " + t("yeni_mesaj") : ""}">
       <div class="gorsel">${foto(k)}</div><span class="ad">${k.ad}</span>${k.okunmamis ? `<span class="rozet">${k.okunmamis}</span>` : ""}</button>`).join("");
   const yazan = ks.filter(k => k.okunmamis).map(k => k.ad);
-  $("hap").hidden = !yazan.length; $("hapYazi").textContent = yazan.join(" ve ") + " sana yazdı";
+  $("hap").hidden = !yazan.length; $("hapYazi").textContent = t("yazdi", { adlar: yazan.join(t("ve")) });
   document.body.classList.toggle("gece", !!D.gece); $("uyku").classList.toggle("gece", !!D.gece);
   if (simdiki) baslikCiz();
 }
@@ -233,34 +263,49 @@ function bildir(yazi, hata) {
 $("geri").addEventListener("click", anaya);
 
 function cubuklar(id, n) { let x = (id * 9301 + 49297) % 233280, s = ""; for (let i = 0; i < n; i++) { x = (x * 9301 + 49297) % 233280; s += `<i style="height:${30 + Math.round(x / 233280 * 70)}%;animation-delay:${(i % 7) * .08}s"></i>`; } return s; }
-// Kişi ekranında yalnızca SON GELEN sesli mesaj gösterilir (dinle düğmesi)
-let sonListe = "", sonGelen = null;
+// Kişi ekranında tek "dinle" düğmesi: dinlenmemiş mesaj varsa HEPSİNİ eskiden yeniye sırayla çalar,
+// hepsi dinlendiyse yalnızca SON mesajı çalar.
+let sonListe = "", sonGelen = null, gelenler = [], kuyruk = [], kuyrukToplam = 0, kuyrukSira = 0;
+const dinlenmemis = () => gelenler.filter(m => !m.dinlendi);
 function listeCiz(ms) {
-  let m = null; for (let i = ms.length - 1; i >= 0; i--) if (ms[i].yon === "gelen" && ms[i].dosya) { m = ms[i]; break; }
-  const imza = JSON.stringify(m) + caliyorId; if (imza === sonListe) return; sonListe = imza;
+  gelenler = ms.filter(m => m.yon === "gelen" && m.dosya);
+  const m = gelenler.length ? gelenler[gelenler.length - 1] : null;
+  const imza = JSON.stringify(gelenler.map(x => [x.id, x.dinlendi])) + caliyorId; if (imza === sonListe) return; sonListe = imza;
   sonGelen = m; dinleCiz();
 }
 function dinleCiz() {
   const k = kisiBul(simdiki); if (!k) return;
-  const m = sonGelen, cal = m && caliyorId === m.id, kart = $("dinle"), b = $("oynatB");
+  const m = sonGelen, cal = caliyorId !== null, yeni = dinlenmemis().length, kart = $("dinle"), b = $("oynatB");
   kart.style.setProperty("--renk", k.renk);
-  kart.classList.toggle("yok", !m); kart.classList.toggle("yeni", !!m && !m.dinlendi && !cal); kart.classList.toggle("caliyor", !!cal);
-  b.disabled = !m; b.innerHTML = cal ? IK.dur : IK.oynat; b.setAttribute("aria-label", cal ? "Durdur" : "Son mesajı dinle");
+  kart.classList.toggle("yok", !m); kart.classList.toggle("yeni", !!yeni && !cal); kart.classList.toggle("caliyor", cal);
+  b.disabled = !m; b.innerHTML = cal ? IK.dur : IK.oynat; b.setAttribute("aria-label", cal ? t("durdur") : t("dinle"));
   $("dalga2").innerHTML = cubuklar(m ? m.id : 7, 18);
-  $("dinleYazi").textContent = !m ? "Henüz mesaj yok" : cal ? "Dinliyorsun…" : !m.dinlendi ? "Yeni mesaj!" : "Tekrar dinle";
+  $("dinleYazi").textContent = !m ? t("mesaj_yok")
+    : cal ? t("dinliyorsun") + (kuyrukToplam > 1 ? ` ${kuyrukSira}/${kuyrukToplam}` : "")
+    : yeni > 1 ? t("yeniler", { n: yeni }) : yeni ? t("yeni") : t("tekrar");
 }
-$("oynatB").addEventListener("click", () => { if (sonGelen) oynat(sonGelen.id, sonGelen.dosya, true); });
+function siradaki() {
+  const m = kuyruk.shift();
+  if (!m) { kuyrukToplam = 0; sesDur(); return; }
+  kuyrukSira++; oynat(m.id, m.dosya, true);
+}
+$("oynatB").addEventListener("click", () => {
+  if (caliyorId !== null) { kuyruk = []; kuyrukToplam = 0; sesDur(); return; }
+  const yeni = dinlenmemis();
+  kuyruk = yeni.length ? yeni.slice() : (sonGelen ? [sonGelen] : []);
+  kuyrukToplam = kuyruk.length; kuyrukSira = 0; siradaki();
+});
 
 /* ---------- dinleme ---------- */
 const ses = $("ses");
 function oynat(id, dosya, gelen) {
-  if (caliyorId === id) { sesDur(); return; }
   ses.src = "/medya/" + dosya; ses.currentTime = 0;
-  ses.play().catch(() => {}); caliyorId = id; sonListe = ""; dinleCiz();
-  if (gelen) fetch("/api/dinlendi/" + id, { method: "POST" }).then(() => { if (sonGelen && sonGelen.id === id) sonGelen.dinlendi = 1; durumAl(); });
+  ses.play().catch(() => {}); caliyorId = id; sonListe = "";
+  if (gelen) { const m = gelenler.find(x => x.id === id); if (m && !m.dinlendi) { m.dinlendi = 1; fetch("/api/dinlendi/" + id, { method: "POST" }).then(durumAl); } }
+  dinleCiz();
 }
-function sesDur() { ses.pause(); if (caliyorId !== null) { caliyorId = null; sonListe = ""; dinleCiz(); } }
-ses.addEventListener("ended", sesDur);
+function sesDur() { ses.pause(); kuyruk = []; kuyrukToplam = 0; if (caliyorId !== null) { caliyorId = null; sonListe = ""; dinleCiz(); } }
+ses.addEventListener("ended", () => { if (kuyruk.length) { caliyorId = null; setTimeout(siradaki, 600); } else sesDur(); });
 
 /* ---------- kayıt ---------- */
 let akim = null, kaydedici = null, parcalar = [], kayitBas = 0, sayacT = null, analiz = null, animT = null;
@@ -278,7 +323,7 @@ async function mikrofon() {
 }
 async function kayitBasla() {
   sesDur();
-  try { await mikrofon(); } catch (e) { $("hataYazi").textContent = "Mikrofon bulunamadı"; panel("hata"); setTimeout(() => panel("bos"), 2500); return; }
+  try { await mikrofon(); } catch (e) { $("hataYazi").textContent = t("mik_yok"); panel("hata"); setTimeout(() => panel("bos"), 2500); return; }
   if (ctx && ctx.state === "suspended") ctx.resume();
   const tur = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4", ""].find(t => !t || (window.MediaRecorder && MediaRecorder.isTypeSupported(t)));
   kaydedici = new MediaRecorder(akim, tur ? { mimeType: tur, audioBitsPerSecond: 64000 } : undefined);
@@ -301,14 +346,14 @@ function kayitDurdur() { clearInterval(sayacT); cancelAnimationFrame(animT); ret
 async function kayitBitir() {
   if (mod !== "kayit") return;
   const sn = (performance.now() - kayitBas) / 1000; const blob = await kayitDurdur();
-  if (!blob || sn < 0.8) { $("hataYazi").textContent = "Çok kısa oldu, bir daha dene"; panel("hata"); setTimeout(() => mod === "hata" && panel("bos"), 1800); return; }
+  if (!blob || sn < 0.8) { $("hataYazi").textContent = t("kisa"); panel("hata"); setTimeout(() => mod === "hata" && panel("bos"), 1800); return; }
   const k = kisiBul(simdiki), kisi = simdiki;
   panel("bos"); anaya();                                   // hemen ana ekrana dön
-  bildir(ek(k.ad) + " gönderildi");
+  bildir(t("gonderildi")(k.ad));
   try {
     const r = await fetch("/api/gonder?kisi=" + kisi, { method: "POST", body: blob, headers: { "Content-Type": blob.type || "application/octet-stream" } });
     if (!r.ok) throw new Error(await r.text());
-  } catch (e) { bildir("Gönderilemedi, bir daha dene", true); }
+  } catch (e) { bildir(t("gonderilemedi"), true); }
 }
 async function kayitIptal() { await kayitDurdur(); panel("bos"); }
 $("mik").addEventListener("click", kayitBasla);
@@ -316,11 +361,11 @@ $("dur").addEventListener("click", kayitBitir);
 
 /* ---------- canlı güncelleme ---------- */
 let sonZil = 0;
-function zil(hafif) {
-  if (!ctx || D.sessiz) return; if (ctx.state === "suspended") ctx.resume();
+function zil(hafif, deneme) {
+  if (!ctx || (!deneme && (D.sessiz || !D.zil_acik))) return; if (ctx.state === "suspended") ctx.resume();
   sonZil = Date.now();
   const t = ctx.currentTime + 0.05;
-  const cikis = ctx.createGain(); cikis.gain.value = hafif ? 0.4 : 0.8;
+  const cikis = ctx.createGain(); cikis.gain.value = (hafif ? 0.5 : 1) * (D.zil_seviye ?? 80) / 100;
   const sik = ctx.createDynamicsCompressor(); cikis.connect(sik).connect(ctx.destination);
   [[659.25, 0], [880, 0.18], [1318.5, 0.36]].forEach(([f, d]) => {          // Mi - La - Mi (ding-dang-dong)
     [[1, "sine", 1], [2, "sine", 0.25], [3, "triangle", 0.08]].forEach(([k, tip, v]) => {
@@ -345,6 +390,7 @@ function bagla() {
     const o = JSON.parse(e.data);
     if (o.tur === "mesaj") { if (o.yon === "gelen" && !D.sessiz) { uyandir(); zil(); } durumAl(); if (o.kisi === simdiki) mesajlariAl(); }
     else if (o.tur === "baglanti") { D.cevrimici = o.cevrimici; D.neden = o.neden || ""; baglantiGoster(); }
+    else if (o.tur === "zil_dene") { uyandir(); zil(false, true); }
     else durumAl();
   };
   ws.onclose = () => { setTimeout(bagla, wsBekle); wsBekle = Math.min(15000, wsBekle * 2); };
@@ -352,26 +398,27 @@ function bagla() {
 
 /* ---------- uyku ---------- */
 let sonDokunma = Date.now();
-function uyandir() { sonDokunma = Date.now(); $("uyku").classList.remove("acik"); }
+function uykuBildir(u) { fetch("/api/ekran", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uyku: u }) }).catch(() => {}); }
+function uyandir() { sonDokunma = Date.now(); if ($("uyku").classList.contains("acik")) { $("uyku").classList.remove("acik"); uykuBildir(false); } }
 ["pointerdown", "keydown"].forEach(ev => document.addEventListener(ev, () => { const uyuyordu = $("uyku").classList.contains("acik"); uyandir(); }, true));
 $("uyku").addEventListener("pointerdown", e => { e.stopPropagation(); e.preventDefault(); uyandir(); });
 setInterval(() => {
   const bos = (Date.now() - sonDokunma) / 60000;
   if (mod === "kayit" || !ses.paused) { sonDokunma = Date.now(); return; }
   if (simdiki && bos > Math.min(2, D.uyku_dakika || 2)) anaya();
-  if (bos > (D.uyku_dakika || 2)) $("uyku").classList.add("acik");
+  if (bos > (D.uyku_dakika || 2) && !$("uyku").classList.contains("acik")) { $("uyku").classList.add("acik"); uykuBildir(true); }
 }, 5000);
 /* ---------- saat (24 saat) ---------- */
-const GUNLER = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
-const AYLAR = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
 const AY_IK = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z"/></svg>';
 let sonDakika = -1;
+const METIN_TARIH = d => t("tarih")(t("gunler")[d.getDay()], d.getDate(), t("aylar")[d.getMonth()]);
 function saatCiz() {
-  const t = new Date(), p = n => String(n).padStart(2, "0");
-  $("saat").textContent = p(t.getHours()) + ":" + p(t.getMinutes());
-  $("tarih").innerHTML = (D.gece ? AY_IK : "") + `<span>${GUNLER[t.getDay()]}, ${t.getDate()} ${AYLAR[t.getMonth()]}</span>`;
-  if (t.getMinutes() !== sonDakika) {        // ekranda iz kalmasın diye saat her dakika biraz kayar
-    sonDakika = t.getMinutes();
+  const sa = new Date(), p = n => String(n).padStart(2, "0");
+  $("saat").textContent = p(sa.getHours()) + ":" + p(sa.getMinutes());
+  $("saatKutu").hidden = D.saat_goster === false;
+  $("tarih").innerHTML = (D.gece ? AY_IK : "") + `<span>${METIN_TARIH(sa)}</span>`;
+  if (sa.getMinutes() !== sonDakika) {        // ekranda iz kalmasın diye saat her dakika biraz kayar
+    sonDakika = sa.getMinutes();
     $("saatKutu").style.transform = `translate(${Math.round(Math.random() * 8 - 4)}vw, ${Math.round(Math.random() * 8 - 4)}vh)`;
   }
 }

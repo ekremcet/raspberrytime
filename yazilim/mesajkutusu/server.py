@@ -18,6 +18,8 @@ import pathlib
 import re
 import secrets
 import shutil
+import signal
+import socket
 import sqlite3
 import time
 from datetime import datetime
@@ -29,7 +31,6 @@ BASE = pathlib.Path(__file__).resolve().parent
 SURUM = __import__("hashlib").sha1((BASE / "static" / "index.html").read_bytes()).hexdigest()[:10]
 log = logging.getLogger("kutu")
 RENKLER = ["#F28B50", "#4D8DF7", "#9B6BE0", "#2FA98C", "#E0588E", "#E3A21A", "#5B7CFA", "#D1495B"]
-MESAJ_SINIRI = 40  # kişi başına saklanan son mesaj sayısı
 
 
 # ----------------------------------------------------------------- ayarlar
@@ -37,11 +38,12 @@ def ayarlari_oku():
     cfg = {
         "BOT_TOKEN": "",
         "YONETICI_PIN": "",
-        "KUTU_ADI": "Mesaj Kutusu",
+        "KUTU_ADI": "",
         "PORT": "8080",
-        "MAKS_SANIYE": "60",
-        "HATIRLAT_DAKIKA": "10",       # dinlenmemiş mesaj varken hatırlatma zili (0: kapalı)
-        "UZAKTAN_ARAYUZ": "0",         # 1: çocuk ekranı ev ağındaki başka cihazlardan da açılabilir
+        "MAKS_SANIYE": "",
+        "HATIRLAT_DAKIKA": "",
+        "UZAKTAN_ARAYUZ": "",
+        "EKRAN_DONDUR": "",
         "VERI_KLASORU": str(BASE / "veri"),
         "TELEGRAM_API": "https://api.telegram.org",
     }
@@ -77,14 +79,97 @@ def aralikta(bas, bit, simdi=None):
     return a <= t < b if a < b else (t >= a or t < b)
 
 
-# Yönetim sayfasından değiştirilebilen ayarlar (veritabanında saklanır)
-AYAR_VARSAYILAN = {
-    "sessiz_elle": "0",        # 1: yönetici sessiz moda aldı (kapatana kadar)
-    "gece_otomatik": "1",      # 1: her gece belirtilen saatlerde kendiliğinden sessiz
-    "gece_baslangic": "19:30",
-    "gece_bitis": "07:30",
-    "uyku_dakika": "2",        # dokunulmazsa ekran bu kadar dakika sonra kararır (saat görünür)
-    "gece_yanit": "1",         # 1: sessizken gelen ilk mesaja gönderene kısa bilgi notu
+# Yönetim sayfasından değiştirilebilen ayarlar (veritabanında saklanır).
+# anahtar: (varsayılan, tür, ayarlar.env'deki eski karşılığı)
+# tür: bool | sayi:min:max | saat | secim:a,b,... | metin:uzunluk
+AYARLAR = {
+    # genel
+    "kutu_adi": ("Mesaj Kutusu", "metin:40", "KUTU_ADI"),
+    "cocuk_adi": ("", "bosmetin:30", None),     # bot uyarılarında geçer ("Bunu ... göremez")
+    "dil": ("tr", "secim:tr,en", None),
+    "maks_saniye": ("60", "sayi:5:300", "MAKS_SANIYE"),
+    "saklanan_mesaj": ("40", "sayi:5:500", None),
+    "dinlendi_tepki": ("1", "bool", None),
+    "uzaktan_arayuz": ("0", "bool", "UZAKTAN_ARAYUZ"),
+    # ses
+    "zil_acik": ("1", "bool", None),
+    "zil_seviye": ("80", "sayi:0:100", None),
+    "hatirlat_dakika": ("10", "sayi:0:240", "HATIRLAT_DAKIKA"),
+    # ekran
+    "uyku_dakika": ("2", "sayi:0.5:120", None),
+    "saat_goster": ("1", "bool", None),
+    "ekran_yonu": ("", "secim:,0,90,180,270", "EKRAN_DONDUR"),
+    "gece_tema": ("1", "bool", None),
+    "parlaklik": ("100", "sayi:5:100", None),
+    "gece_parlaklik": ("30", "sayi:5:100", None),
+    # sessiz mod ve gece
+    "sessiz_elle": ("0", "bool", None),
+    "gece_otomatik": ("1", "bool", None),
+    "gece_baslangic": ("19:30", "saat", None),
+    "gece_bitis": ("07:30", "saat", None),
+    "gece_yanit": ("1", "bool", None),
+}
+
+
+def ayar_dogrula(k, v):
+    """Değeri türüne göre denetler, düzgün metin hâlini döndürür; uymazsa ValueError."""
+    if k not in AYARLAR:
+        raise ValueError(f"bilinmeyen ayar: {k}")
+    tur = AYARLAR[k][1]
+    v = "" if v is None else str(v).strip()
+    if tur == "bool":
+        return "1" if v.lower() in ("1", "true", "evet", "on") else "0"
+    if tur == "saat":
+        if dakika(v) is None:
+            raise ValueError("Saat SS:DD biçiminde olmalı (örn. 19:30)")
+        m = dakika(v)
+        return f"{m // 60:02d}:{m % 60:02d}"
+    if tur.startswith("sayi:"):
+        _, lo, hi = tur.split(":")
+        try:
+            x = float(v.replace(",", "."))
+        except ValueError:
+            raise ValueError("Sayı olmalı")
+        if not float(lo) <= x <= float(hi):
+            raise ValueError(f"{lo} ile {hi} arasında olmalı")
+        return str(int(x)) if x == int(x) else str(x)
+    if tur.startswith("secim:"):
+        if v not in tur[6:].split(","):
+            raise ValueError("Geçersiz seçim")
+        return v
+    if tur.startswith("metin:"):
+        if not v:
+            raise ValueError("Boş olamaz")
+        return v[: int(tur[6:])]
+    if tur.startswith("bosmetin:"):
+        return v[: int(tur[9:])]
+    return v
+
+
+# Bot mesajları (aile üyelerinin Telegram'ında görünür)
+METINLER = {
+    "tr": {
+        "hosgeldin": "Merhaba {ad}! Burası {kutu}. Ailen seni onayladığında buradan sesli mesaj gönderip alabileceksin.",
+        "onay_bekleniyor": "Onay bekleniyor. Onaylandığında sana haber vereceğim.",
+        "onaylandi": "Onaylandın! Artık buradan {kutu} ile sesli mesajlaşabilirsin. Mikrofon tuşuna basılı tutup konuş, gönder.",
+        "start": "Merhaba {ad}! Buraya gönderdiğin sesli mesajlar {kutu} ekranına düşer.",
+        "sadece_ses": "⚠️ Bunu {kim} göremez, yalnızca sesli mesajları görebilir. Mikrofon tuşuna basılı tutup konuşarak sesli mesaj gönder.",
+        "kim_yok": "kutu",
+        "sessiz_not": "🌙 {kutu} şu an sessiz modda. Mesajın kaydedildi, {ne_zaman} bildirim olarak görünecek.",
+        "ne_zaman_saat": "saat {saat} olunca",
+        "ne_zaman_elle": "sessiz mod kapanınca",
+    },
+    "en": {
+        "hosgeldin": "Hi {ad}! This is {kutu}. Once the family approves you, you can send and receive voice messages here.",
+        "onay_bekleniyor": "Waiting for approval. I'll let you know when you're approved.",
+        "onaylandi": "You're approved! You can now exchange voice messages with {kutu}. Hold the microphone button, talk and send.",
+        "start": "Hi {ad}! Voice messages you send here show up on {kutu}'s screen.",
+        "sadece_ses": "⚠️ {kim} can't see this, only voice messages. Hold the microphone button and talk to send one.",
+        "kim_yok": "The box",
+        "sessiz_not": "🌙 {kutu} is in quiet mode right now. Your message is saved and will show up {ne_zaman}.",
+        "ne_zaman_saat": "at {saat}",
+        "ne_zaman_elle": "when quiet mode ends",
+    },
 }
 
 
@@ -229,18 +314,21 @@ async def deneme_sesi(cikti, saniye=3):
 class Kutu:
     def __init__(self, cfg):
         self.cfg = cfg
-        self.demo = not cfg["BOT_TOKEN"]
         self.veri = pathlib.Path(cfg["VERI_KLASORU"])
         self.medya = self.veri / "medya"
         self.medya.mkdir(parents=True, exist_ok=True)
         self.depo = Depo(self.veri / "kutu.db")
+        # Yönetim sayfasından değiştirilen anahtar ayar dosyasındakinin önüne geçer
+        self.token = self.depo.meta("gizli_bot_token") or cfg["BOT_TOKEN"]
+        self.demo = not self.token
         self.wslar = set()
         self.cevrimici = self.demo
         self.neden = ""                     # bağlantı yoksa: "internet" ya da "anahtar"
         self.bot_kullanici = None
+        self.uykuda = False
         self.tg = None
         self.gorevler = []
-        self.pin = cfg["YONETICI_PIN"] or self._pin_uret()
+        self.pin = self.depo.meta("gizli_pin") or cfg["YONETICI_PIN"] or self._pin_uret()
         if self.demo and not self.depo.q("SELECT id FROM kisiler"):
             for i, ad in enumerate(["Anne", "Baba", "Babaanne"]):
                 self.depo.kisi_ekle(-(i + 1), ad, None, durum=1)
@@ -248,7 +336,20 @@ class Kutu:
     # ---- ayarlar ve sessiz mod
     def ayar(self, k):
         v = self.depo.meta("ayar_" + k)
-        return AYAR_VARSAYILAN[k] if v is None else v
+        if v is not None:
+            return v
+        varsayilan, _, env = AYARLAR[k]
+        if env and self.cfg.get(env):
+            try:
+                return ayar_dogrula(k, self.cfg[env])
+            except ValueError:
+                pass
+        return varsayilan
+
+    def m(self, anahtar, **kw):
+        """Seçili dilde bot mesajı."""
+        dil = METINLER.get(self.ayar("dil"), METINLER["tr"])
+        return dil[anahtar].format(kutu=self.ayar("kutu_adi"), **kw)
 
     def ayar_yaz(self, k, v):
         self.depo.meta("ayar_" + k, v)
@@ -258,6 +359,22 @@ class Kutu:
 
     def sessiz_mi(self):
         return self.ayar("sessiz_elle") == "1" or self.gece_mi()
+
+    def parlaklik_uygula(self):
+        """Arka ışık: uykuda kısık (saat görünüyorsa) ya da kapalı, gece ayrı seviye, gündüz normal."""
+        if self.uykuda:
+            hedef = min(10, float(self.ayar("gece_parlaklik"))) if self.ayar("saat_goster") == "1" else 0
+        elif self.gece_mi():
+            hedef = float(self.ayar("gece_parlaklik"))
+        else:
+            hedef = float(self.ayar("parlaklik"))
+        if getattr(self, "_son_parlaklik", None) != hedef and parlaklik_yaz(hedef):
+            self._son_parlaklik = hedef
+
+    async def parlaklik_dongusu(self):
+        while True:
+            self.parlaklik_uygula()
+            await asyncio.sleep(30)
 
     def sessiz_donemi(self):
         """Aynı sessiz dönem içinde gönderene yalnızca bir kez not yazmak için dönem kimliği."""
@@ -270,7 +387,7 @@ class Kutu:
         return "gece-" + gun.isoformat()
 
     def ayarlar_json(self):
-        d = {k: self.ayar(k) for k in AYAR_VARSAYILAN}
+        d = {k: self.ayar(k) for k in AYARLAR}
         d.update(simdi_sessiz=self.sessiz_mi(), simdi_gece=self.gece_mi(), saat=datetime.now().strftime("%H:%M"))
         return d
 
@@ -293,7 +410,7 @@ class Kutu:
 
     # ---- bakım: eski mesajları ve dosyalarını sil
     def budama(self, kisi):
-        eski = self.depo.q("SELECT id, dosya FROM mesajlar WHERE kisi=? ORDER BY id DESC LIMIT -1 OFFSET ?", (kisi, MESAJ_SINIRI))
+        eski = self.depo.q("SELECT id, dosya FROM mesajlar WHERE kisi=? ORDER BY id DESC LIMIT -1 OFFSET ?", (kisi, int(float(self.ayar("saklanan_mesaj")))))
         for m in eski:
             if m["dosya"]:
                 (self.medya / m["dosya"]).unlink(missing_ok=True)
@@ -357,15 +474,14 @@ class Kutu:
             tam = " ".join(x for x in [ilk_ad, kimden.get("last_name")] if x) or kimden.get("username") or "Bilinmeyen"
             self.depo.kisi_ekle(chat_id, tam, kimden.get("username"))
             log.info("onay bekleyen yeni kişi: %s (%s)", tam, chat_id)
-            await self.metin(chat_id, f"Merhaba {ilk_ad}! Burası {self.cfg['KUTU_ADI']}. "
-                                      "Ailen seni onayladığında buradan sesli mesaj gönderip alabileceksin.")
+            await self.metin(chat_id, self.m("hosgeldin", ad=ilk_ad))
             await self.yayinla({"tur": "yonetim"})
             return
         if k["durum"] == -1:
             return
         if k["durum"] == 0:
             if (msg.get("text") or "").startswith("/start"):
-                await self.metin(chat_id, "Onay bekleniyor. Onaylandığında sana haber vereceğim.")
+                await self.metin(chat_id, self.m("onay_bekleniyor"))
             return
         ses = msg.get("voice") or msg.get("audio")
         if ses:
@@ -393,14 +509,13 @@ class Kutu:
                 donem = self.sessiz_donemi()
                 if self.depo.meta(f"sessiz_not_{k['id']}") != donem:
                     self.depo.meta(f"sessiz_not_{k['id']}", donem)
-                    ne_zaman = (f"saat {self.ayar('gece_bitis')}'te" if self.ayar("sessiz_elle") != "1" else "sessiz mod kapanınca")
-                    await self.metin(chat_id, f"🌙 {self.cfg['KUTU_ADI']} şu an sessiz modda. Mesajın kaydedildi, "
-                                              f"{ne_zaman} bildirim olarak görünecek.")
+                    ne_zaman = (self.m("ne_zaman_saat", saat=self.ayar("gece_bitis")) if self.ayar("sessiz_elle") != "1"
+                                else self.m("ne_zaman_elle"))
+                    await self.metin(chat_id, self.m("sessiz_not", ne_zaman=ne_zaman))
         elif msg.get("text", "").startswith("/start"):
-            await self.metin(chat_id, f"Merhaba {ilk_ad}! Buraya gönderdiğin sesli mesajlar {self.cfg['KUTU_ADI']} ekranına düşer.")
+            await self.metin(chat_id, self.m("start", ad=ilk_ad))
         else:
-            await self.metin(chat_id, "Kutu yalnızca sesli mesajları gösterebiliyor. "
-                                      "Mikrofon tuşuna basılı tutup konuşarak sesli mesaj gönderebilirsin.")
+            await self.metin(chat_id, self.m("sadece_ses", kim=self.ayar("cocuk_adi") or self.m("kim_yok")))
 
     async def teslim_et(self, mid):
         m = self.depo.mesaj(mid)
@@ -436,7 +551,7 @@ class Kutu:
 
     async def tepki(self, m):
         """Çocuk mesajı dinleyince gönderenin Telegram'ında mesaja 👀 tepkisi bırakır."""
-        if self.demo or not m["tg_id"]:
+        if self.demo or not m["tg_id"] or self.ayar("dinlendi_tepki") != "1":
             return
         k = self.depo.kisi(m["kisi"])
         try:
@@ -455,7 +570,7 @@ def kutu(req) -> Kutu:
 
 
 def yerel_mi(req):
-    if kutu(req).cfg["UZAKTAN_ARAYUZ"] == "1":
+    if kutu(req).ayar("uzaktan_arayuz") == "1":
         return
     if req.remote not in ("127.0.0.1", "::1", None):
         raise web.HTTPForbidden(text="Çocuk ekranı yalnızca cihazın kendisinden açılır.")
@@ -477,10 +592,12 @@ async def durum(req):
     sayi = {r["kisi"]: r["n"] for r in b.depo.q(
         "SELECT kisi, COUNT(*) n FROM mesajlar WHERE yon='gelen' AND dinlendi=0 AND dosya IS NOT NULL GROUP BY kisi")}
     return web.json_response({
-        "kutu_adi": b.cfg["KUTU_ADI"], "maks_saniye": int(b.cfg["MAKS_SANIYE"]),
-        "uyku_dakika": float(b.ayar("uyku_dakika")), "sessiz": b.sessiz_mi(), "gece": b.gece_mi(),
-        "gece_bitis": b.ayar("gece_bitis"),
-        "hatirlat_dakika": float(b.cfg.get("HATIRLAT_DAKIKA") or 0), "surum": SURUM,
+        "kutu_adi": b.ayar("kutu_adi"), "maks_saniye": float(b.ayar("maks_saniye")), "dil": b.ayar("dil"),
+        "uyku_dakika": float(b.ayar("uyku_dakika")), "sessiz": b.sessiz_mi(),
+        "gece": b.gece_mi() and b.ayar("gece_tema") == "1", "gece_bitis": b.ayar("gece_bitis"),
+        "zil_acik": b.ayar("zil_acik") == "1", "zil_seviye": float(b.ayar("zil_seviye")),
+        "saat_goster": b.ayar("saat_goster") == "1", "ekran_yonu": b.ayar("ekran_yonu"),
+        "hatirlat_dakika": float(b.ayar("hatirlat_dakika")), "surum": SURUM,
         "cevrimici": b.cevrimici, "demo": b.demo, "neden": b.neden,
         "kisiler": [kisi_json(k, sayi.get(k["id"], 0)) for k in kisiler],
     })
@@ -568,7 +685,7 @@ async def y_bilgi(req):
     yonetici(req)
     b = kutu(req)
     return web.json_response({
-        "kutu_adi": b.cfg["KUTU_ADI"], "demo": b.demo, "cevrimici": b.cevrimici, "neden": b.neden,
+        "kutu_adi": b.ayar("kutu_adi"), "demo": b.demo, "cevrimici": b.cevrimici, "neden": b.neden,
         "bot": b.bot_kullanici, "baglanti": f"https://t.me/{b.bot_kullanici}" if b.bot_kullanici else None,
         "ffmpeg": bool(shutil.which("ffmpeg")),
     })
@@ -598,8 +715,7 @@ async def y_kisi_guncelle(req):
     if alan:
         b.depo.x(f"UPDATE kisiler SET {', '.join(k2 + '=?' for k2 in alan)} WHERE id=?", (*alan.values(), k["id"]))
     if alan.get("durum") == 1 and k["durum"] != 1 and k["chat_id"] > 0:
-        await b.metin(k["chat_id"], f"Onaylandın! Artık buradan {b.cfg['KUTU_ADI']} ile sesli mesajlaşabilirsin. "
-                                    "Mikrofon tuşuna basılı tutup konuş, gönder.")
+        await b.metin(k["chat_id"], b.m("onaylandi"))
     await b.yayinla({"tur": "kisiler"})
     return web.json_response(b.depo.kisi(k["id"]))
 
@@ -670,22 +786,305 @@ async def y_ayarlar(req):
     b = kutu(req)
     if req.method == "POST":
         veri = await req.json()
-        for k, v in veri.items():
-            if k not in AYAR_VARSAYILAN:
-                raise web.HTTPBadRequest(text=f"bilinmeyen ayar: {k}")
-            v = str(v).strip()
-            if k in ("gece_baslangic", "gece_bitis") and dakika(v) is None:
-                raise web.HTTPBadRequest(text="Saat SS:DD biçiminde olmalı (örn. 19:30)")
-            if k == "uyku_dakika" and not (v.replace(".", "", 1).isdigit() and 0.5 <= float(v) <= 120):
-                raise web.HTTPBadRequest(text="Ekran kararma süresi 0.5–120 dakika olmalı")
-            if k in ("sessiz_elle", "gece_otomatik", "gece_yanit"):
-                v = "1" if v in ("1", "true", "True") else "0"
-                if k == "sessiz_elle" and v == "1" and b.ayar("sessiz_elle") != "1":
-                    b.depo.meta("sessiz_elle_zaman", int(time.time()))
+        temiz = {}
+        try:
+            for k, v in veri.items():
+                temiz[k] = ayar_dogrula(k, v)
+        except ValueError as e:
+            raise web.HTTPBadRequest(text=str(e))
+        for k, v in temiz.items():
+            if k == "sessiz_elle" and v == "1" and b.ayar("sessiz_elle") != "1":
+                b.depo.meta("sessiz_elle_zaman", int(time.time()))
             b.ayar_yaz(k, v)
-        log.info("ayarlar güncellendi: %s", veri)
+        log.info("ayarlar güncellendi: %s", temiz)
+        if "ekran_yonu" in temiz:
+            asyncio.create_task(ekran_yonu_uygula())
+        if temiz.keys() & {"parlaklik", "gece_parlaklik", "gece_otomatik", "gece_baslangic", "gece_bitis", "sessiz_elle"}:
+            b.parlaklik_uygula()
         await b.yayinla({"tur": "ayarlar"})
     return web.json_response(b.ayarlar_json())
+
+
+# ---------------------------------------------------------- donanım ve sistem
+async def komut(*args, sure=15):
+    """Komutu çalıştırır, (çıkış kodu, çıktı) döndürür. Program yoksa 127."""
+    if not shutil.which(args[0]):
+        return 127, f"{args[0]} bulunamadı"
+    env = dict(os.environ)
+    env.setdefault("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+    p = await asyncio.create_subprocess_exec(*args, stdout=asyncio.subprocess.PIPE,
+                                             stderr=asyncio.subprocess.STDOUT, env=env)
+    try:
+        out, _ = await asyncio.wait_for(p.communicate(), sure)
+    except asyncio.TimeoutError:
+        p.kill()
+        return 124, "zaman aşımı"
+    return p.returncode, out.decode(errors="replace").strip()
+
+
+async def ses_seviyesi(hedef):
+    kod, out = await komut("wpctl", "get-volume", hedef)
+    m = re.search(r"Volume:\s*([\d.]+)", out)
+    return round(float(m[1]) * 100) if kod == 0 and m else None
+
+
+async def ses_durumu():
+    kod, out = await komut("pw-dump")
+    if kod != 0:
+        return {"var": False, "hata": "Ses sistemi (PipeWire) bulunamadı"}
+    try:
+        nesneler = json.loads(out)
+    except ValueError:
+        return {"var": False, "hata": "Ses aygıtları okunamadı"}
+    cihaz = {"Audio/Sink": [], "Audio/Source": []}
+    varsayilan = {}
+    for o in nesneler:
+        if o.get("type") == "PipeWire:Interface:Node":
+            pr = (o.get("info") or {}).get("props") or {}
+            if pr.get("media.class") in cihaz:
+                cihaz[pr["media.class"]].append({"id": o["id"], "isim": pr.get("node.name"),
+                                                 "ad": pr.get("node.description") or pr.get("node.nick") or pr.get("node.name")})
+        elif o.get("type") == "PipeWire:Interface:Metadata" and (o.get("props") or {}).get("metadata.name") == "default":
+            for m in o.get("metadata") or []:
+                deger = m.get("value")
+                if isinstance(deger, str):
+                    try:
+                        deger = json.loads(deger)
+                    except ValueError:
+                        deger = {}
+                if m.get("key") in ("default.audio.sink", "default.audio.source") and isinstance(deger, dict):
+                    varsayilan[m["key"]] = deger.get("name")
+
+    def sec(liste, anahtar):
+        for c in liste:
+            if c["isim"] == varsayilan.get(anahtar):
+                return c["id"]
+        return liste[0]["id"] if liste else None
+
+    hop, mik = cihaz["Audio/Sink"], cihaz["Audio/Source"]
+    return {"var": True, "hoparlorler": hop, "mikrofonlar": mik,
+            "hoparlor": sec(hop, "default.audio.sink"), "mikrofon": sec(mik, "default.audio.source"),
+            "ses": await ses_seviyesi("@DEFAULT_AUDIO_SINK@"), "mik_ses": await ses_seviyesi("@DEFAULT_AUDIO_SOURCE@")}
+
+
+def arka_isik():
+    for d in sorted(pathlib.Path("/sys/class/backlight").glob("*")):
+        if (d / "brightness").exists():
+            return d
+    return None
+
+
+def parlaklik_durumu():
+    d = arka_isik()
+    if not d:
+        return {"var": False}
+    try:
+        mx = int((d / "max_brightness").read_text())
+        return {"var": True, "deger": round(int((d / "brightness").read_text()) * 100 / mx),
+                "yazilabilir": os.access(d / "brightness", os.W_OK)}
+    except (OSError, ValueError, ZeroDivisionError):
+        return {"var": False}
+
+
+def parlaklik_yaz(yuzde):
+    d = arka_isik()
+    if not d:
+        return False
+    try:
+        mx = int((d / "max_brightness").read_text())
+        (d / "brightness").write_text(str(max(0, min(mx, round(mx * yuzde / 100)))))
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def wayland_ortami():
+    calisma = pathlib.Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}")
+    soketler = sorted(calisma.glob("wayland-[0-9]"))
+    if not soketler:
+        return None
+    return {"XDG_RUNTIME_DIR": str(calisma), "WAYLAND_DISPLAY": soketler[0].name,
+            "DBUS_SESSION_BUS_ADDRESS": f"unix:path={calisma}/bus"}
+
+
+async def ekran_yonu_uygula():
+    """kiosk.sh --dondur: yönü sunucudan okuyup ekrana ve dokunmatiğe uygular."""
+    ortam = wayland_ortami()
+    if not ortam:
+        return False, "Masaüstü oturumu açık değil; bir sonraki açılışta uygulanacak"
+    env = dict(os.environ, **ortam)
+    p = await asyncio.create_subprocess_exec("bash", str(BASE / "sistem" / "kiosk.sh"), "--dondur",
+                                             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, env=env)
+    out, _ = await p.communicate()
+    log.info("ekran yönü: %s", out.decode(errors="replace").strip())
+    return p.returncode == 0, out.decode(errors="replace").strip()
+
+
+def depo_klasoru():
+    r = pathlib.Path(os.environ.get("MESAJKUTUSU_REPO") or pathlib.Path.home() / "raspberrytime")
+    return r if (r / ".git").exists() else None
+
+
+def yeniden_baslat_sonra(saniye=1.0):
+    """Yanıt gönderildikten sonra kendini kapatır; systemd (Restart=always) yeniden başlatır."""
+    asyncio.get_running_loop().call_later(saniye, os.kill, os.getpid(), signal.SIGTERM)
+
+
+async def y_ses(req):
+    yonetici(req)
+    if req.method == "POST":
+        veri = await req.json()
+        try:
+            if veri.get("hoparlor") is not None:
+                await komut("wpctl", "set-default", str(int(veri["hoparlor"])))
+            if veri.get("mikrofon") is not None:
+                await komut("wpctl", "set-default", str(int(veri["mikrofon"])))
+            for anahtar, hedef in (("ses", "@DEFAULT_AUDIO_SINK@"), ("mik_ses", "@DEFAULT_AUDIO_SOURCE@")):
+                if veri.get(anahtar) is not None:
+                    x = max(0, min(100, int(veri[anahtar])))
+                    kod, out = await komut("wpctl", "set-volume", hedef, f"{x / 100:.2f}")
+                    if kod != 0:
+                        raise web.HTTPBadRequest(text="Ses ayarlanamadı: " + out[:120])
+        except (TypeError, ValueError):
+            raise web.HTTPBadRequest(text="Geçersiz değer")
+    return web.json_response(await ses_durumu())
+
+
+async def y_zil(req):
+    yonetici(req)
+    await kutu(req).yayinla({"tur": "zil_dene"})
+    return web.json_response({"ok": True})
+
+
+async def y_ekran(req):
+    yonetici(req)
+    if req.method == "POST":
+        veri = await req.json()
+        if veri.get("yonu_uygula"):
+            ok, mesaj = await ekran_yonu_uygula()
+            return web.json_response({"ok": ok, "mesaj": mesaj, **parlaklik_durumu()})
+    return web.json_response(parlaklik_durumu())
+
+
+async def ekran_bildirim(req):
+    """Çocuk ekranı uykuya geçince/uyanınca haber verir (arka ışık kısılır/açılır)."""
+    yerel_mi(req)
+    b = kutu(req)
+    veri = await req.json()
+    b.uykuda = bool(veri.get("uyku"))
+    b.parlaklik_uygula()
+    return web.json_response({"ok": True})
+
+
+async def y_guvenlik(req):
+    yonetici(req)
+    b = kutu(req)
+    if req.method == "POST":
+        veri = await req.json()
+        if "pin" in veri:
+            pin = str(veri["pin"]).strip()
+            if not re.fullmatch(r"\d{4,12}", pin):
+                raise web.HTTPBadRequest(text="PIN 4–12 rakam olmalı")
+            b.depo.meta("gizli_pin", pin)
+            b.pin = pin
+            log.info("yönetici PIN'i değiştirildi")
+        if "bot_token" in veri:
+            tok = str(veri["bot_token"]).strip()
+            if tok:
+                if not re.fullmatch(r"\d{5,}:[A-Za-z0-9_-]{30,}", tok):
+                    raise web.HTTPBadRequest(text="Anahtar 123456789:AAH... biçiminde olmalı")
+                try:
+                    async with ClientSession(connector=TCPConnector(resolver=ThreadedResolver())) as o:
+                        async with o.get(f"{b.cfg['TELEGRAM_API'].rstrip('/')}/bot{tok}/getMe",
+                                         timeout=ClientTimeout(total=15)) as r:
+                            sonuc = await r.json()
+                except Exception:
+                    raise web.HTTPBadRequest(text="Telegram'a ulaşılamadı, anahtar denenemedi")
+                if not sonuc.get("ok"):
+                    raise web.HTTPBadRequest(text="Telegram bu anahtarı kabul etmedi")
+                b.depo.meta("gizli_bot_token", tok)
+            else:
+                b.depo.x("DELETE FROM meta WHERE k='gizli_bot_token'")
+            log.info("bot anahtarı değiştirildi, yeniden başlatılıyor")
+            yeniden_baslat_sonra(1.5)
+            return web.json_response({"ok": True, "yeniden_basliyor": True})
+    tok = b.token or ""
+    return web.json_response({
+        "token_var": bool(tok), "token_maske": (tok[:6] + "…" + tok[-4:]) if len(tok) > 16 else ("••••" if tok else ""),
+        "token_kaynak": "panel" if b.depo.meta("gizli_bot_token") else ("dosya" if b.cfg["BOT_TOKEN"] else ""),
+        "pin_kaynak": "panel" if b.depo.meta("gizli_pin") else ("dosya" if b.cfg["YONETICI_PIN"] else "otomatik"),
+    })
+
+
+async def sistem_bilgisi(b):
+    d = {"ad": socket.gethostname()}
+    kod, out = await komut("hostname", "-I")
+    d["ip"] = out.split()[:2] if kod == 0 else []
+    try:
+        d["sicaklik"] = round(int(pathlib.Path("/sys/class/thermal/thermal_zone0/temp").read_text()) / 1000, 1)
+    except (OSError, ValueError):
+        d["sicaklik"] = None
+    try:
+        d["acik_sure"] = float(pathlib.Path("/proc/uptime").read_text().split()[0])
+    except (OSError, ValueError):
+        d["acik_sure"] = None
+    du = shutil.disk_usage(b.veri)
+    d["disk_bos"], d["disk_toplam"] = round(du.free / 1e9, 1), round(du.total / 1e9, 1)
+    try:
+        mi = dict(re.findall(r"^(\w+):\s+(\d+)", pathlib.Path("/proc/meminfo").read_text(), re.M))
+        d["bellek_bos"], d["bellek_toplam"] = round(int(mi["MemAvailable"]) / 1e6, 1), round(int(mi["MemTotal"]) / 1e6, 1)
+    except (OSError, KeyError):
+        pass
+    repo = depo_klasoru()
+    d["depo"] = bool(repo)
+    if repo:
+        kod, out = await komut("git", "-C", str(repo), "log", "-1", "--format=%h|%cd|%s", "--date=format:%d.%m.%Y %H:%M")
+        if kod == 0 and out.count("|") >= 2:
+            d["surum"], d["surum_tarih"], d["surum_not"] = out.split("|", 2)
+    gl = b.veri / "guncelleme.log"
+    if gl.exists():
+        d["guncelleme_log"] = "\n".join(gl.read_text(errors="replace").splitlines()[-12:])
+    return d
+
+
+async def y_sistem(req):
+    yonetici(req)
+    b = kutu(req)
+    if req.method == "POST":
+        islem = (await req.json()).get("islem")
+        repo = depo_klasoru()
+        if islem == "denetle":
+            if not repo:
+                raise web.HTTPBadRequest(text="Depo yok: Pi'de bir kez 'git clone https://github.com/ekremcet/raspberrytime ~/raspberrytime' çalıştır")
+            kod, out = await komut("git", "-C", str(repo), "fetch", "--quiet", "origin", sure=40)
+            if kod != 0:
+                raise web.HTTPBadRequest(text="GitHub'a ulaşılamadı: " + out[:120])
+            kod, out = await komut("git", "-C", str(repo), "log", "--format=%s", "HEAD..@{u}")
+            yeniler = [x for x in out.splitlines() if x.strip()] if kod == 0 else []
+            return web.json_response({**await sistem_bilgisi(b), "yeniler": yeniler})
+        if islem == "guncelle":
+            if not repo:
+                raise web.HTTPBadRequest(text="Depo yok")
+            gl = b.veri / "guncelleme.log"
+            gl.write_text(f"{datetime.now():%d.%m.%Y %H:%M} güncelleme başladı\n")
+            kod, out = await komut("systemd-run", "--user", "--collect", "--quiet", f"--unit=mesajkutusu-guncelle-{int(time.time())}",
+                                   "bash", "-c", f"bash '{repo}/yazilim/guncelle.sh' >> '{gl}' 2>&1")
+            if kod != 0:
+                raise web.HTTPBadRequest(text="Güncelleme başlatılamadı: " + out[:120])
+            return web.json_response({"ok": True, "mesaj": "Güncelleme başladı; kutu 1 dakika içinde yeniden açılır"})
+        if islem == "uygulama":
+            yeniden_baslat_sonra()
+            return web.json_response({"ok": True, "mesaj": "Uygulama yeniden başlatılıyor"})
+        if islem in ("yeniden_baslat", "kapat"):
+            eylem = "reboot" if islem == "yeniden_baslat" else "poweroff"
+            kod, out = await komut("systemctl", eylem, "--no-wall")
+            if kod != 0:
+                kod, out = await komut("sudo", "-n", "/usr/bin/systemctl", eylem)
+            if kod != 0:
+                raise web.HTTPBadRequest(text="İzin yok. Pi'de bir kez uzak kabuktan 'bash ~/raspberrytime/yazilim/guncelle.sh' çalıştırıp şifreni gir.")
+            return web.json_response({"ok": True, "mesaj": "Cihaz " + ("yeniden başlatılıyor" if islem == "yeniden_baslat" else "kapanıyor")})
+        raise web.HTTPBadRequest(text="bilinmeyen işlem")
+    return web.json_response(await sistem_bilgisi(b))
 
 
 def statik(ad):
@@ -702,11 +1101,12 @@ async def baslangic(app):
         log.warning("BOT_TOKEN yok: DEMO modunda çalışıyor (Telegram'a bağlanmıyor).")
     else:
         app["oturum"] = ClientSession(connector=TCPConnector(resolver=ThreadedResolver()))
-        b.tg = Telegram(b.cfg["BOT_TOKEN"], b.cfg["TELEGRAM_API"].rstrip("/"), app["oturum"])
+        b.tg = Telegram(b.token, b.cfg["TELEGRAM_API"].rstrip("/"), app["oturum"])
         b.gorevler.append(asyncio.create_task(b.dinleme_dongusu()))
         b.gorevler.append(asyncio.create_task(b.yeniden_deneme_dongusu()))
         for m in b.depo.q("SELECT id FROM mesajlar WHERE yon='giden' AND durum IN ('bekliyor','hata')"):
             b.gorevler.append(asyncio.create_task(b.teslim_et(m["id"])))
+    b.gorevler.append(asyncio.create_task(b.parlaklik_dongusu()))
     port = b.cfg["PORT"]
     log.info("Çocuk ekranı:  http://localhost:%s/", port)
     log.info("Yönetim:       http://<bu-cihazın-adresi>:%s/yonetim   PIN: %s", port, b.pin)
@@ -746,6 +1146,16 @@ def uygulama(cfg=None):
         web.post("/api/yonetim/deneme/{kid}", y_deneme),
         web.get("/api/yonetim/ayarlar", y_ayarlar),
         web.post("/api/yonetim/ayarlar", y_ayarlar),
+        web.get("/api/yonetim/ses", y_ses),
+        web.post("/api/yonetim/ses", y_ses),
+        web.post("/api/yonetim/zil", y_zil),
+        web.get("/api/yonetim/ekran", y_ekran),
+        web.post("/api/yonetim/ekran", y_ekran),
+        web.get("/api/yonetim/guvenlik", y_guvenlik),
+        web.post("/api/yonetim/guvenlik", y_guvenlik),
+        web.get("/api/yonetim/sistem", y_sistem),
+        web.post("/api/yonetim/sistem", y_sistem),
+        web.post("/api/ekran", ekran_bildirim),
     ])
     app.on_startup.append(baslangic)
     app.on_cleanup.append(kapanis)
