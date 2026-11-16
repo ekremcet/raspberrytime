@@ -114,7 +114,8 @@ h1 { margin: 0; font-size: clamp(26px, 6vh, 50px); font-weight: 900; letter-spac
 .baglanti { position: absolute; top: 1.4vh; left: 50%; transform: translateX(-50%); background: #fff; color: var(--muted); border-radius: 999px; padding: .6vh 1.4vw; font-size: 2.2vh; font-weight: 800; box-shadow: 0 4px 14px rgba(29, 36, 51, .12); display: flex; align-items: center; gap: 8px; z-index: 5; }
 .baglanti svg { width: 2.6vh; height: 2.6vh; }
 .uyku { position: fixed; inset: 0; background: #000; z-index: 20; opacity: 0; pointer-events: none; transition: opacity 1.2s; display: flex; align-items: center; justify-content: center; }
-.uyku.acik { opacity: 1; pointer-events: auto; }
+.uyku.acik, .uyku.kalkan { opacity: 1; pointer-events: auto; }
+.uyku.kalkan:not(.acik) { opacity: 0; }
 .saat-kutu { display: flex; flex-direction: column; align-items: center; gap: 1vh; color: #C9D2E3; transition: transform 2s; font-variant-numeric: tabular-nums; }
 .saat { font-size: 30vh; font-weight: 800; letter-spacing: -.02em; line-height: 1; }
 .tarih { font-size: 5vh; font-weight: 700; color: #7E899C; display: flex; align-items: center; gap: 1.4vh; }
@@ -438,8 +439,33 @@ function bagla() {
 let sonDokunma = Date.now();
 function uykuBildir(u) { fetch("/api/ekran", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uyku: u }) }).catch(() => {}); }
 function uyandir() { sonDokunma = Date.now(); if ($("uyku").classList.contains("acik")) { $("uyku").classList.remove("acik"); uykuBildir(false); } }
-["pointerdown", "keydown"].forEach(ev => document.addEventListener(ev, () => { const uyuyordu = $("uyku").classList.contains("acik"); uyandir(); }, true));
-$("uyku").addEventListener("pointerdown", e => { e.stopPropagation(); e.preventDefault(); uyandir(); });
+// Uyurken ilk dokunuş YALNIZCA ekranı açar: o dokunuşa ait hiçbir olay (basma, bırakma, tıklama, kaydırma)
+// alttaki kişiye ya da düğmeye ulaşmaz. Parmak kalkana kadar ve sonrasında kısa bir süre olaylar yutulur.
+let uyanmaDokunusu = false, yutBitis = 0;
+function dokunmaYut(e) {
+  if (!uyanmaDokunusu && Date.now() >= yutBitis) return false;
+  if (e.cancelable) e.preventDefault();
+  e.stopPropagation(); e.stopImmediatePropagation();
+  return true;
+}
+document.addEventListener("pointerdown", e => {
+  if ($("uyku").classList.contains("acik")) {
+    uyanmaDokunusu = true; $("uyku").classList.add("kalkan");
+    uyandir(); dokunmaYut(e); return;
+  }
+  if (dokunmaYut(e)) return;
+  uyandir();
+}, true);
+function uyanmaBitti(e) {
+  if (!uyanmaDokunusu) return dokunmaYut(e);
+  dokunmaYut(e); uyanmaDokunusu = false; yutBitis = Date.now() + 350;
+  setTimeout(() => $("uyku").classList.remove("kalkan"), 350);
+}
+document.addEventListener("pointerup", uyanmaBitti, true);
+document.addEventListener("pointercancel", uyanmaBitti, true);
+["click", "mousedown", "mouseup", "touchstart", "touchmove", "touchend", "contextmenu", "dblclick"]
+  .forEach(ev => document.addEventListener(ev, dokunmaYut, { capture: true, passive: false }));
+document.addEventListener("keydown", uyandir, true);
 setInterval(() => {
   const bos = (Date.now() - sonDokunma) / 60000;
   if (mod === "kayit" || !ses.paused) { sonDokunma = Date.now(); return; }

@@ -199,7 +199,7 @@ Kurulumdan sonra **bütün ayarlar yönetim sayfasından** değiştirilir ve hem
   - Solda **dinle**: dinlenmemiş mesaj varsa (örn. "3 yeni mesaj!") **hepsini eskiden yeniye sırayla** çalar ("Dinliyorsun… 2/3"); hepsi dinlendiyse yalnızca **son** mesajı çalar. Yeni mesaj varken kart parlar.
   - Sağda **mikrofon**: dokun, konuş, kareye dokun. Mesaj hemen gönderilir ve ana ekrana dönülür; altta "Anne'ye gönderildi" yazar.
 - **Zil:** yeni mesaj gelince üç notalı zil çalar, ekran uyuyorsa uyanır. Dinlenmemiş mesaj varsa ayarlanan aralıkta (varsayılan 10 dk) hafif bir zil tekrar çalar. Zil ve yüksekliği **Ses** sekmesinden.
-- **Ekran kararması:** varsayılan 2 dakika dokunulmazsa ekran kararır ve büyük, 24 saatlik bir **saat** ile tarih gösterir (iz kalmasın diye saat her dakika hafifçe yer değiştirir). Dokununca uyanır. Kişi ekranında en geç 2 dakika sonra ana ekrana dönülür.
+- **Ekran kararması:** varsayılan 2 dakika dokunulmazsa ekran kararır ve büyük, 24 saatlik bir **saat** ile tarih gösterir (iz kalmasın diye saat her dakika hafifçe yer değiştirir). Dokununca uyanır; uyandıran ilk dokunuş yalnızca ekranı açar, alttaki kişiye ya da düğmeye basılmış sayılmaz. Kişi ekranında en geç 2 dakika sonra ana ekrana dönülür.
 - **Sessiz mod:** zil ve hatırlatma çalmaz, yeni mesaj ekranı uyandırmaz. Mesajlar yine gelir; kutucuklar parlar, rozetler görünür, çocuk ekrana dokununca görür.
 - **Gece (varsayılan 19:30–07:30):** otomatik sessiz mod + ekran koyu ve kısık renklere geçer; karardığında saat sıcak, kısık bir renkte ve ay simgesiyle görünür.
 - **İnternet giderse:** üstte "İnternet yok, mesajlar sonra gidecek" yazar; giden mesajlar saklanır ve bağlantı gelince gönderilir.
