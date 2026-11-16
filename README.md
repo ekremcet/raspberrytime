@@ -37,13 +37,13 @@ Inspired by [button.box](https://button.box); it uses a 7" touchscreen instead o
 
 ```mermaid
 flowchart LR
-  A[Family member<br/>Telegram app] <-- voice note --> T[(Telegram<br/>Bot API)]
-  T <-- HTTPS long polling --> S[server.py<br/>Raspberry Pi 5]
-  S <-- WebSocket + HTTP --> K[Chromium full screen<br/>7&quot; touchscreen]
-  S --- D[(SQLite + audio files<br/>~/mesajkutusu/veri)]
-  M[BOYA USB microphone] --> K
-  K --> H[USB speaker]
-  Y[Admin page<br/>phone/computer] -- PIN --> S
+  A["Family member<br/>Telegram app"] <-- "voice note" --> T[("Telegram<br/>Bot API")]
+  T <-- "HTTPS long polling" --> S["server.py<br/>Raspberry Pi 5"]
+  S <-- "WebSocket + HTTP" --> K["Chromium full screen<br/>7-inch touchscreen"]
+  S --- D[("SQLite + audio files<br/>~/mesajkutusu/veri")]
+  M["BOYA USB microphone"] --> K
+  K --> H["USB speaker"]
+  Y["Admin page<br/>phone or computer"] -- "PIN" --> S
 ```
 
 - A single Python server (`aiohttp`) runs on the Pi. It listens to Telegram, converts audio to Opus with `ffmpeg`, and keeps contacts and messages in SQLite.
