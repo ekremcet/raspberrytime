@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mesaj Kutusu</string>
+    <string name="servis_kanal">Mesaj kutusu sunucusu</string>
+    <string name="servis_metin">Sesli mesajlar dinleniyor</string>
+</resources>

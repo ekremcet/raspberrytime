@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Tema" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowBackground">@color/arka</item>
+        <item name="android:statusBarColor">@color/arka</item>
+        <item name="android:navigationBarColor">@color/arka</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+    <color name="arka">#F3F6FB</color>
+    <color name="ikon_arka">#2F6FED</color>
+</resources>

@@ -123,12 +123,12 @@ pre.kayit { background: var(--bg); border: 1px solid var(--line); border-radius:
       <section class="kart bilgi">
         <h2>Hoparlör</h2>
         <p class="not" id="sesYok" hidden></p>
-        <label class="alan"><span>Hoparlör</span><select id="hoparlor"></select></label>
+        <label class="alan" id="hoparlorAlan"><span>Hoparlör</span><select id="hoparlor"></select></label>
         <label class="alan"><span>Ses seviyesi (mesajlar ve zil)</span>
           <div class="kaydirma"><input type="range" id="sesSeviye" min="0" max="100" step="5"><output id="sesSeviyeYaz"></output></div></label>
         <div class="satir"><button type="button" id="zilDene">Zili kutuda çal</button></div>
       </section>
-      <section class="kart bilgi">
+      <section class="kart bilgi" id="mikKart">
         <h2>Mikrofon</h2>
         <label class="alan"><span>Mikrofon</span><select id="mikrofon"></select></label>
         <label class="alan"><span>Mikrofon seviyesi</span>
@@ -246,6 +246,12 @@ pre.kayit { background: var(--bg); border: 1px solid var(--line); border-radius:
         <div class="satir"><button type="button" class="ana" id="wifiBagla">Bu ağa bağlan</button></div>
         <p class="kucuk" style="margin:0">Kutu yeni ağa geçer; bu sayfa bağlantıyı kaybedebilir. Bağlanamazsa eski ağa döner ya da ekranda kurulum ağının QR kodunu gösterir.</p>
       </section>
+      <section class="kart bilgi" id="kilitKart" hidden>
+        <h2>Tablet kilidi</h2>
+        <p class="kucuk" style="margin:0" id="kilitDurum"></p>
+        <div class="satir"><button type="button" id="kilitAc">Kilidi 10 dakika aç</button><button type="button" id="kilitle">Şimdi kilitle</button></div>
+        <p class="kucuk" style="margin:0">Kilit açıkken tabletin ana ekranına ve ayarlarına geçebilirsin. Süre dolunca ya da kutu uygulamasına dönünce yeniden kilitlenir.</p>
+      </section>
       <section class="kart bilgi">
         <h2>Güncelleme</h2>
         <p class="kucuk" style="margin:0" id="guncelDurum"></p>
@@ -357,6 +363,7 @@ $("sessizDugme").addEventListener("click", () => {
 /* ---------- ses ---------- */
 function sesCiz(d) {
   $("sesYok").hidden = d.var; $("sesYok").textContent = d.hata || "";
+  $("hoparlorAlan").hidden = $("mikKart").hidden = !!d.android;     // tablette aygıt seçimi yok
   const sec = (el, liste, secili) => { el.innerHTML = (liste || []).map(c => `<option value="${c.id}">${esc(c.ad)}</option>`).join("") || "<option>Bulunamadı</option>"; if (secili != null) el.value = secili; };
   sec($("hoparlor"), d.hoparlorler, d.hoparlor); sec($("mikrofon"), d.mikrofonlar, d.mikrofon);
   if (d.ses != null) { $("sesSeviye").value = d.ses; $("sesSeviyeYaz").textContent = "%" + d.ses; }
@@ -404,12 +411,30 @@ $("tokenDegis").addEventListener("submit", async e => {
 const sureYaz = sn => { const g = Math.floor(sn / 86400), s = Math.floor(sn % 86400 / 3600), d = Math.floor(sn % 3600 / 60); return (g ? g + " gün " : "") + (s ? s + " saat " : "") + d + " dk"; };
 function sistemCiz(d) {
   const satir = (a, b) => b == null || b === "" ? "" : `<dt>${a}</dt><dd>${esc(b)}</dd>`;
+  if (d.platform === "android") {
+    $("sistemBilgi").innerHTML = satir("Tablet", d.ad) + satir("Android", d.android) + satir("Adres", (d.ip || []).join(", ")) +
+      satir("Uygulama", d.uygulama_surum) + satir("Pil", d.pil != null ? `%${d.pil}${d.sarj ? " · şarj oluyor" : ""}` : null) +
+      satir("Disk", `${d.disk_bos} GB boş / ${d.disk_toplam} GB`);
+    document.querySelector('[data-sistem="kapat"]').hidden = true;
+    document.querySelector('[data-sistem="yeniden_baslat"]').textContent = "Tableti yeniden başlat";
+    $("kilitKart").hidden = false; kilitYukle();
+    return;
+  }
   $("sistemBilgi").innerHTML = satir("Cihaz", d.ad) + satir("Adres", (d.ip || []).join(", ")) +
     satir("Sürüm", d.surum ? `${d.surum} · ${d.surum_tarih} · ${d.surum_not}` : (d.depo ? "" : "GitHub deposu yok")) +
     satir("Sıcaklık", d.sicaklik != null ? d.sicaklik + " °C" : null) + satir("Açık kalma", d.acik_sure != null ? sureYaz(d.acik_sure) : null) +
     satir("Disk", `${d.disk_bos} GB boş / ${d.disk_toplam} GB`) + satir("Bellek", d.bellek_toplam ? `${d.bellek_bos} GB boş / ${d.bellek_toplam} GB` : null);
   $("guncelKayit").hidden = !d.guncelleme_log; $("guncelKayit").textContent = d.guncelleme_log || "";
 }
+function kilitCiz(k) {
+  $("kilitDurum").textContent = !k.kilitli ? `Kilit açık${k.kalan_dk ? ` (${k.kalan_dk} dk sonra kilitlenir)` : ""}.`
+    : k.cihaz_sahibi ? "Kilitli: tam kilit (cihaz sahibi). Çocuk kutu uygulamasından çıkamaz."
+    : "Kilitli: uygulama sabitlendi. Tam kilit için README'deki cihaz sahibi adımına bak.";
+}
+async function kilitYukle() { try { kilitCiz(await api("/api/yonetim/kilit")); } catch (e) {} }
+const kilitIslem = (veri, yazi) => kaydet(() => api("/api/yonetim/kilit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(veri) }), yazi).then(kilitCiz).catch(() => {});
+$("kilitAc").addEventListener("click", () => kilitIslem({ ac: true, dakika: 10 }, "✓ Kilit 10 dakika açık"));
+$("kilitle").addEventListener("click", () => kilitIslem({ ac: false }, "✓ Kilitlendi"));
 async function sistemYukle() { try { sistemCiz(await api("/api/yonetim/sistem")); } catch (e) {} wifiYukle(); }
 async function wifiYukle() {
   let d; try { d = await api("/api/yonetim/wifi"); } catch (e) { return; }

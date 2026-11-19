@@ -8,7 +8,7 @@ Telegram botu üzerinden aile üyeleriyle sesli mesajlaşan çocuk cihazının a
  - Çocuk ekranı (static/index.html) ve yönetim sayfası (static/yonetim.html) bu sunucudan açılır
  - BOT_TOKEN yoksa DEMO modunda çalışır: Telegram'a bağlanmadan ekranı ve kaydı denersin
 
-Bağımlılıklar: Python 3.9+, aiohttp, ffmpeg (ffprobe dahil)
+Bağımlılıklar: Python 3.9+, aiohttp; ffmpeg isteğe bağlı (yoksa opusogg.py ile WebM->Ogg taşınır)
 """
 import asyncio
 import json
@@ -22,13 +22,34 @@ import signal
 import socket
 import sqlite3
 import time
+import wave
 from datetime import datetime
 
+import opusogg
 from aiohttp import ClientSession, TCPConnector, ThreadedResolver, ClientTimeout, FormData, WSMsgType, web
 
 BASE = pathlib.Path(__file__).resolve().parent
 # Ekran sürümü: index.html değişince kiosk sayfası kendini yeniler
-SURUM = __import__("hashlib").sha1((BASE / "static" / "index.html").read_bytes()).hexdigest()[:10]
+# Tablette (Android uygulaması) web dosyaları uygulamanın kendi klasörüne açılır
+STATIK = pathlib.Path(os.environ.get("MESAJKUTUSU_STATIK") or BASE / "static")
+ANDROID = os.environ.get("MESAJKUTUSU_PLATFORM") == "android"
+SURUM = __import__("hashlib").sha1((STATIK / "index.html").read_bytes()).hexdigest()[:10]
+
+
+def kopru():
+    """Android uygulamasının Kotlin köprüsü (Chaquopy). Yalnızca ANDROID iken çağrılır."""
+    from java import jclass  # noqa: Chaquopy modülü
+    return jclass("com.mesajkutusu.Kopru")
+
+
+def tcp_baglayici():
+    """Telegram bağlantısı. Tablette sertifikalar certifi'den (Android'in deposu Python'a görünmez)."""
+    kw = {"resolver": ThreadedResolver()}
+    if ANDROID:
+        import ssl
+        import certifi
+        kw["ssl"] = ssl.create_default_context(cafile=certifi.where())
+    return TCPConnector(**kw)
 log = logging.getLogger("kutu")
 RENKLER = ["#F28B50", "#4D8DF7", "#9B6BE0", "#2FA98C", "#E0588E", "#E3A21A", "#5B7CFA", "#D1495B"]
 
@@ -281,8 +302,25 @@ async def calistir(*args):
     return p.returncode, out.decode(errors="ignore"), err.decode(errors="ignore")
 
 
+def ffmpeg_var():
+    if os.environ.get("MESAJKUTUSU_FFMPEG") == "0":      # test için ffmpeg'siz çalışma
+        return False
+    return bool(shutil.which("ffmpeg") and shutil.which("ffprobe"))
+
+
 async def opus_yap(girdi, cikti):
-    """Her türlü ses girdisini Telegram sesli notu biçimine (mono OGG/Opus) çevirir."""
+    """Her türlü ses girdisini Telegram sesli notu biçimine (mono OGG/Opus) çevirir.
+    ffmpeg yoksa (tablet) tarayıcı kaydı (WebM/Opus) yeniden kodlanmadan Ogg'a taşınır."""
+    if not ffmpeg_var():
+        veri = pathlib.Path(girdi).read_bytes()
+        if veri[:4] == b"OggS":
+            pathlib.Path(cikti).write_bytes(veri)
+            return
+        if veri[:4] != b"\x1a\x45\xdf\xa3":
+            raise RuntimeError("ffmpeg yok ve kayıt WebM değil")
+        ogg, _ = await asyncio.to_thread(opusogg.webm_to_ogg, veri)
+        pathlib.Path(cikti).write_bytes(ogg)
+        return
     kod, _, err = await calistir(
         "ffmpeg", "-y", "-loglevel", "error", "-i", str(girdi), "-vn", "-ac", "1", "-ar", "48000",
         "-c:a", "libopus", "-b:a", "32k", "-application", "voip", "-avoid_negative_ts", "make_zero", str(cikti),
@@ -292,6 +330,15 @@ async def opus_yap(girdi, cikti):
 
 
 async def sure_olc(dosya):
+    if not ffmpeg_var():
+        yol = pathlib.Path(dosya)
+        try:
+            if yol.suffix == ".wav":
+                with wave.open(str(yol)) as w:
+                    return round(w.getnframes() / w.getframerate(), 1)
+            return opusogg.ogg_sure(yol.read_bytes())
+        except Exception:
+            return 0.0
     kod, out, _ = await calistir("ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(dosya))
     try:
         return round(float(out.strip()), 1)
@@ -300,7 +347,11 @@ async def sure_olc(dosya):
 
 
 async def deneme_sesi(cikti, saniye=3):
-    """Hoparlör testi için kısa bir melodi üretir."""
+    """Hoparlör testi için kısa bir melodi üretir. ffmpeg yoksa WAV yazar (dosya adı .wav olur)."""
+    if not ffmpeg_var():
+        yol = pathlib.Path(cikti).with_suffix(".wav")
+        yol.write_bytes(opusogg.melodi_wav(saniye))
+        return yol
     kod, _, err = await calistir(
         "ffmpeg", "-y", "-loglevel", "error",
         "-f", "lavfi", "-i", f"sine=frequency=523:duration={saniye/3}",
@@ -311,6 +362,7 @@ async def deneme_sesi(cikti, saniye=3):
     )
     if kod != 0:
         raise RuntimeError("ffmpeg: " + err[-400:])
+    return pathlib.Path(cikti)
 
 
 # ----------------------------------------------------------------- uygulama
@@ -524,6 +576,9 @@ class Kutu:
             elif uzanti in (".mp3", ".m4a"):
                 hedef = self.medya / f"gelen_{mid}{uzanti}"
                 ham.rename(hedef)
+            elif not ffmpeg_var():          # tablet: tarayıcı çoğu biçimi doğrudan çalar
+                hedef = self.medya / f"gelen_{mid}{uzanti or '.bin'}"
+                ham.rename(hedef)
             else:
                 hedef = self.medya / f"gelen_{mid}.ogg"
                 await opus_yap(ham, hedef)
@@ -532,6 +587,8 @@ class Kutu:
             self.depo.mesaj_guncelle(mid, dosya=hedef.name, sure=sure)
             self.budama(k["id"])
             log.info("sesli mesaj geldi: %s (%.1f sn)%s", k["ad"], sure, " [sessiz]" if self.sessiz_mi() else "")
+            if ANDROID and not self.sessiz_mi():
+                kopru().uyandir()           # ekran kapalıysa (güç tuşu) aç
             await self.yayinla({"tur": "mesaj", "kisi": k["id"], "yon": "gelen"})
             if self.sessiz_mi() and self.ayar("gece_yanit") == "1":
                 donem = self.sessiz_donemi()
@@ -590,7 +647,7 @@ class Kutu:
 
 
 # ----------------------------------------------------------------- http
-ADLAR = re.compile(r"^[a-z0-9_]+\.(ogg|mp3|m4a|jpg)$")
+ADLAR = re.compile(r"^[a-z0-9_]+\.(ogg|oga|opus|mp3|m4a|aac|wav|webm|flac|bin|jpg)$")
 
 
 def kutu(req) -> Kutu:
@@ -689,7 +746,9 @@ async def medya(req):
     yol = kutu(req).medya / ad
     if not yol.exists():
         raise web.HTTPNotFound()
-    tur = {"ogg": "audio/ogg", "mp3": "audio/mpeg", "m4a": "audio/mp4", "jpg": "image/jpeg"}[ad.rsplit(".", 1)[1]]
+    tur = {"ogg": "audio/ogg", "oga": "audio/ogg", "opus": "audio/ogg", "mp3": "audio/mpeg", "m4a": "audio/mp4",
+           "aac": "audio/aac", "wav": "audio/wav", "webm": "audio/webm", "flac": "audio/flac",
+           "bin": "application/octet-stream", "jpg": "image/jpeg"}[ad.rsplit(".", 1)[1]]
     return web.FileResponse(yol, headers={"Content-Type": tur, "Cache-Control": "max-age=86400"})
 
 
@@ -804,8 +863,7 @@ async def y_deneme(req):
     if not k or k["durum"] != 1:
         raise web.HTTPNotFound()
     mid = b.depo.mesaj_ekle(k["id"], "gelen", "alindi")
-    hedef = b.medya / f"gelen_{mid}.ogg"
-    await deneme_sesi(hedef)
+    hedef = await deneme_sesi(b.medya / f"gelen_{mid}.ogg")
     b.depo.mesaj_guncelle(mid, dosya=hedef.name, sure=await sure_olc(hedef))
     b.budama(k["id"])
     await b.yayinla({"tur": "mesaj", "kisi": k["id"], "yon": "gelen"})
@@ -860,6 +918,9 @@ async def ses_seviyesi(hedef):
 
 
 async def ses_durumu():
+    if ANDROID:
+        return {"var": True, "android": True, "hoparlorler": [], "mikrofonlar": [], "hoparlor": None, "mikrofon": None,
+                "ses": int(kopru().sesSeviyesi()), "mik_ses": None}
     kod, out = await komut("pw-dump")
     if kod != 0:
         return {"var": False, "hata": "Ses sistemi (PipeWire) bulunamadı"}
@@ -906,6 +967,8 @@ def arka_isik():
 
 
 def parlaklik_durumu():
+    if ANDROID:
+        return {"var": True, "deger": round(float(kopru().parlaklikOku())), "yazilabilir": True}
     d = arka_isik()
     if not d:
         return {"var": False}
@@ -918,6 +981,9 @@ def parlaklik_durumu():
 
 
 def parlaklik_yaz(yuzde):
+    if ANDROID:
+        kopru().parlaklik(float(yuzde))      # 0 = en kısık; ekran açık kalır (saat görünür)
+        return True
     d = arka_isik()
     if not d:
         return False
@@ -938,8 +1004,15 @@ def wayland_ortami():
             "DBUS_SESSION_BUS_ADDRESS": f"unix:path={calisma}/bus"}
 
 
+AKTIF = {}          # çalışan Kutu (Android'de ekran yönü için)
+
+
 async def ekran_yonu_uygula():
     """kiosk.sh --dondur: yönü sunucudan okuyup ekrana ve dokunmatiğe uygular."""
+    if ANDROID:
+        b = AKTIF.get("kutu")
+        kopru().yon(b.ayar("ekran_yonu") if b else "")
+        return True, "Ekran yönü uygulandı"
     ortam = wayland_ortami()
     if not ortam:
         return False, "Masaüstü oturumu açık değil; bir sonraki açılışta uygulanacak"
@@ -960,7 +1033,11 @@ def depo_klasoru():
 
 
 def yeniden_baslat_sonra(saniye=1.0):
-    """Yanıt gönderildikten sonra kendini kapatır; systemd (Restart=always) yeniden başlatır."""
+    """Yanıt gönderildikten sonra kendini kapatır; systemd (Restart=always) yeniden başlatır.
+    Android'de süreç öldürülmez: android_calistir() sunucuyu aynı süreçte yeniden kurar."""
+    if ANDROID:
+        asyncio.get_running_loop().call_later(saniye, lambda: AKTIF["yeniden"].set())
+        return
     asyncio.get_running_loop().call_later(saniye, os.kill, os.getpid(), signal.SIGTERM)
 
 
@@ -975,6 +1052,10 @@ async def y_ses(req):
             if veri.get("mikrofon") is not None:
                 await komut("wpctl", "set-default", str(int(veri["mikrofon"])))
                 kutu(req).ayar_yaz("ses_otomatik", "0")
+            if ANDROID:
+                if veri.get("ses") is not None:
+                    kopru().sesAyarla(max(0, min(100, int(veri["ses"]))))
+                return web.json_response(await ses_durumu())
             for anahtar, hedef in (("ses", "@DEFAULT_AUDIO_SINK@"), ("mik_ses", "@DEFAULT_AUDIO_SOURCE@")):
                 if veri.get(anahtar) is not None:
                     x = max(0, min(100, int(veri[anahtar])))
@@ -1043,7 +1124,13 @@ async def y_guvenlik(req):
 
 
 async def sistem_bilgisi(b):
-    d = {"ad": socket.gethostname()}
+    if ANDROID:
+        d = json.loads(str(kopru().bilgi()))
+        d.update({"platform": "android", "ip": [yerel_ip(b)], "surum": d.get("uygulama_surum")})
+        du = shutil.disk_usage(b.veri)
+        d["disk_bos"], d["disk_toplam"] = round(du.free / 1e9, 1), round(du.total / 1e9, 1)
+        return d
+    d = {"ad": socket.gethostname(), "platform": "linux"}
     kod, out = await komut("hostname", "-I")
     d["ip"] = out.split()[:2] if kod == 0 else []
     try:
@@ -1078,6 +1165,8 @@ async def y_sistem(req):
     b = kutu(req)
     if req.method == "POST":
         islem = (await req.json()).get("islem")
+        if ANDROID:
+            return await android_sistem(b, islem)
         repo = depo_klasoru()
         if islem in ("denetle", "guncelle") and not repo:
             # Hazır imajda ya da SD kart kurulumunda kaynak kod henüz yoksa bir kez klonla
@@ -1191,7 +1280,7 @@ async def kurulum_sayfasi(req):
     b = kutu(req)
     if not b.kurulum_gerekli():
         raise web.HTTPFound("/yonetim")
-    return web.FileResponse(BASE / "static" / "kurulum.html", headers={"Cache-Control": "no-cache"})
+    return web.FileResponse(STATIK / "kurulum.html", headers={"Cache-Control": "no-cache"})
 
 
 async def k_durum(req):
@@ -1249,7 +1338,7 @@ async def anahtar_dene(b, tok, req=None):
     if not re.fullmatch(r"\d{5,}:[A-Za-z0-9_-]{30,}", tok):
         raise web.HTTPBadRequest(text=kh(req, "bicim"))
     try:
-        async with ClientSession(connector=TCPConnector(resolver=ThreadedResolver())) as o:
+        async with ClientSession(connector=tcp_baglayici()) as o:
             async with o.post(f"{b.cfg['TELEGRAM_API'].rstrip('/')}/bot{tok}/getMe",
                              timeout=ClientTimeout(total=15)) as r:
                 sonuc = await r.json()
@@ -1342,7 +1431,7 @@ async def k_ekran_cevir(req):
 
 # --------------------------------------------- USB ses aygıtlarını otomatik seç
 async def ses_otomatik_sec(b):
-    if b.ayar("ses_otomatik") != "1":
+    if ANDROID or b.ayar("ses_otomatik") != "1":
         return
     d = await ses_durumu()
     if not d.get("var"):
@@ -1366,22 +1455,105 @@ async def ses_otomatik_dongusu(b):
         await asyncio.sleep(30)
 
 
+# ------------------------------------------------------------ Android (tablet)
+APK_SURUMLER = "https://api.github.com/repos/ekremcet/raspberrytime/releases?per_page=15"
+
+
+async def apk_son_surum():
+    """GitHub sürümleri arasında .apk içeren en yenisi: (etiket, apk_adresi, notlar)."""
+    async with ClientSession(connector=tcp_baglayici()) as o:
+        async with o.get(APK_SURUMLER, timeout=ClientTimeout(total=20),
+                         headers={"Accept": "application/vnd.github+json"}) as r:
+            liste = await r.json(content_type=None)
+    for rel in liste if isinstance(liste, list) else []:
+        for a in rel.get("assets") or []:
+            if a.get("name", "").endswith(".apk"):
+                return rel.get("tag_name"), a.get("browser_download_url"), (rel.get("name") or "")
+    return None, None, None
+
+
+async def android_sistem(b, islem):
+    k = kopru()
+    if islem == "denetle":
+        try:
+            etiket, adres, ad = await apk_son_surum()
+        except Exception as e:
+            raise web.HTTPBadRequest(text="GitHub'a ulaşılamadı: " + str(e)[:100])
+        bilgi = await sistem_bilgisi(b)
+        yeni = bool(etiket and adres and etiket != bilgi.get("uygulama_etiket"))
+        return web.json_response({**bilgi, "yeniler": [f"{etiket}: {ad}"] if yeni else [], "apk": adres if yeni else None})
+    if islem == "guncelle":
+        etiket, adres, _ = await apk_son_surum()
+        if not adres:
+            raise web.HTTPBadRequest(text="Yayınlanmış APK bulunamadı")
+        k.apkKur(adres)
+        return web.json_response({"ok": True, "mesaj": f"{etiket} indiriliyor; tablet kurup uygulamayı yeniden açacak"})
+    if islem == "uygulama":
+        yeniden_baslat_sonra()
+        return web.json_response({"ok": True, "mesaj": "Uygulama yeniden başlatılıyor"})
+    if islem == "yeniden_baslat":
+        if not k.cihazYenidenBaslat():
+            raise web.HTTPBadRequest(text="Tableti yeniden başlatmak için uygulamanın cihaz sahibi (tam kilit) olması gerekir")
+        return web.json_response({"ok": True, "mesaj": "Tablet yeniden başlatılıyor"})
+    if islem == "kapat":
+        raise web.HTTPBadRequest(text="Tablet uzaktan kapatılamaz")
+    raise web.HTTPBadRequest(text="bilinmeyen işlem")
+
+
+async def y_kilit(req):
+    """Tablet kiosk kilidi: durum, geçici açma (dakika), yeniden kilitleme."""
+    yonetici(req)
+    if not ANDROID:
+        raise web.HTTPNotFound(text="Yalnızca tablette")
+    k = kopru()
+    if req.method == "POST":
+        veri = await req.json()
+        if veri.get("ac"):
+            k.kilitAc(int(max(1, min(120, int(veri.get("dakika") or 10)))))
+        else:
+            k.kilitle()
+        await asyncio.sleep(0.8)          # kilit değişikliği ekran iş parçacığında uygulanır
+    return web.json_response(json.loads(str(k.kilitDurumu())))
+
+
+def android_calistir():
+    """Chaquopy'den çağrılır (arka plan iş parçacığında). Sinyal kullanmaz; 'yeniden başlat'ta
+    sunucuyu aynı süreç içinde kapatıp yeniden kurar."""
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s", force=True)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    while True:
+        c = ayarlari_oku()
+        app = uygulama(c)
+        AKTIF["yeniden"] = asyncio.Event()
+        runner = web.AppRunner(app, access_log=None, handle_signals=False, shutdown_timeout=2)
+        loop.run_until_complete(runner.setup())
+        site = web.TCPSite(runner, "0.0.0.0", int(c["PORT"]), reuse_address=True)
+        loop.run_until_complete(site.start())
+        log.info("sunucu hazır (android) :%s", c["PORT"])
+        try:
+            loop.run_until_complete(AKTIF["yeniden"].wait())
+        finally:
+            loop.run_until_complete(runner.cleanup())
+        log.info("sunucu yeniden başlatılıyor")
+
+
 def statik(ad):
     async def h(req):
-        return web.FileResponse(BASE / "static" / ad, headers={"Cache-Control": "no-cache"})
+        return web.FileResponse(STATIK / ad, headers={"Cache-Control": "no-cache"})
     return h
 
 
 async def baslangic(app):
     b = app["kutu"]
-    if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
-        log.error("ffmpeg bulunamadı! Kurulum: sudo apt install ffmpeg  (Mac: brew install ffmpeg)")
+    if not ffmpeg_var():
+        log.info("ffmpeg yok: kayıtlar Python ile Ogg/Opus'a taşınacak (yalnızca WebM/Opus kayıtlar)")
     if b.demo:
         log.warning("BOT_TOKEN yok: DEMO modunda çalışıyor (Telegram'a bağlanmıyor).")
     elif not b.token:
         log.warning("Kurulum bekleniyor: telefondan %s adresini aç (kod: %s)", kurulum_adresi(b), b.depo.meta("kurulum_kodu"))
     else:
-        app["oturum"] = ClientSession(connector=TCPConnector(resolver=ThreadedResolver()))
+        app["oturum"] = ClientSession(connector=tcp_baglayici())
         b.tg = Telegram(b.token, b.cfg["TELEGRAM_API"].rstrip("/"), app["oturum"])
         b.gorevler.append(asyncio.create_task(b.dinleme_dongusu()))
         b.gorevler.append(asyncio.create_task(b.yeniden_deneme_dongusu()))
@@ -1408,10 +1580,11 @@ def uygulama(cfg=None):
     cfg = cfg or ayarlari_oku()
     app = web.Application(client_max_size=20 * 1024 * 1024)
     app["kutu"] = Kutu(cfg)
+    AKTIF["kutu"] = app["kutu"]
     app.add_routes([
         web.get("/", statik("index.html")),
         web.get("/yonetim", statik("yonetim.html")),
-        web.static("/static", BASE / "static"),
+        web.static("/static", STATIK),
         web.get("/api/saglik", saglik),
         web.get("/api/durum", durum),
         web.get("/api/mesajlar/{kid}", mesajlar),
@@ -1448,6 +1621,8 @@ def uygulama(cfg=None):
         web.post("/api/kurulum/wifi", k_wifi),
         web.post("/api/kurulum/ekran_cevir", k_ekran_cevir),
         web.get("/api/yonetim/wifi", y_wifi),
+        web.get("/api/yonetim/kilit", y_kilit),
+        web.post("/api/yonetim/kilit", y_kilit),
     ])
     app.on_startup.append(baslangic)
     app.on_cleanup.append(kapanis)

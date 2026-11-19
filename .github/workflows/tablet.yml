@@ -1,0 +1,86 @@
+# Tablet uygulaması (Android APK): derle, emülatörde dene, "tablet-v*" etiketinde yayınla.
+name: Tablet app
+
+on:
+  push:
+    branches: ["main"]
+    paths: ["android/**", "yazilim/mesajkutusu/**", ".github/workflows/tablet.yml"]
+    tags: ["tablet-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: Build APK
+        env:
+          APK_ETIKET: ${{ startsWith(github.ref, 'refs/tags/tablet-v') && github.ref_name || format('gelistirme-{0}', github.run_number) }}
+        run: |
+          export BUILD_PYTHON="$(which python3)"
+          gradle -p android assembleRelease --stacktrace
+          cp android/app/build/outputs/apk/release/app-release.apk mesajkutusu.apk
+          ls -la mesajkutusu.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mesajkutusu-apk
+          path: mesajkutusu.apk
+
+  emulator:
+    needs: apk
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: mesajkutusu-apk
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Smoke test on an Android 14 tablet emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_tablet
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash android/ci/duman-testi.sh mesajkutusu.apk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: emulator-results
+          path: ci-cikti/
+
+  release:
+    needs: [apk, emulator]
+    if: startsWith(github.ref, 'refs/tags/tablet-v')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: mesajkutusu-apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: mesajkutusu.apk
+          body: |
+            Tablet app for the voice message box (Android 8+). Install the APK on the tablet, open "Mesaj Kutusu",
+            and scan the QR code on the screen with your phone. Full kiosk lock: see the README (tablet section).
