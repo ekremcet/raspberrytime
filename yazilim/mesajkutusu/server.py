@@ -46,6 +46,8 @@ def ayarlari_oku():
         "EKRAN_DONDUR": "",
         "VERI_KLASORU": str(BASE / "veri"),
         "TELEGRAM_API": "https://api.telegram.org",
+        "DEMO": "",                     # 1: bot olmadan örnek kişilerle çalış (geliştirme/deneme)
+        "WIFI_KLASORU": "/run/mesajkutusu",   # Wi-Fi yardımcısının durum dosyaları
     }
     dosya = BASE / "ayarlar.env"
     if dosya.exists():
@@ -95,6 +97,7 @@ AYARLAR = {
     "zil_acik": ("1", "bool", None),
     "zil_seviye": ("80", "sayi:0:100", None),
     "hatirlat_dakika": ("10", "sayi:0:240", "HATIRLAT_DAKIKA"),
+    "ses_otomatik": ("1", "bool", None),       # USB hoparlör ve mikrofonu kendiliğinden varsayılan yap
     # ekran
     "uyku_dakika": ("2", "sayi:0.5:120", None),
     "saat_goster": ("1", "bool", None),
@@ -320,7 +323,14 @@ class Kutu:
         self.depo = Depo(self.veri / "kutu.db")
         # Yönetim sayfasından değiştirilen anahtar ayar dosyasındakinin önüne geçer
         self.token = self.depo.meta("gizli_bot_token") or cfg["BOT_TOKEN"]
-        self.demo = not self.token
+        # Kurulum: anahtarı olmayan yeni kutu, telefondan kurulum sihirbazını bekler.
+        # Bu özellikten önce kurulmuş (anahtarı olan) kutular kurulmuş sayılır.
+        if self.depo.meta("kurulum_tamam") is None:
+            self.depo.meta("kurulum_tamam", "1" if self.token else "0")
+        self.demo = not self.token and (cfg.get("DEMO") == "1" or self.depo.meta("demo") == "1")
+        if self.kurulum_gerekli() and not self.depo.meta("kurulum_kodu"):
+            self.depo.meta("kurulum_kodu", "".join(secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ23456789") for _ in range(6)))
+            self.depo.meta("kurulum_davet", secrets.token_urlsafe(9))
         self.wslar = set()
         self.cevrimici = self.demo
         self.neden = ""                     # bağlantı yoksa: "internet" ya da "anahtar"
@@ -332,6 +342,9 @@ class Kutu:
         if self.demo and not self.depo.q("SELECT id FROM kisiler"):
             for i, ad in enumerate(["Anne", "Baba", "Babaanne"]):
                 self.depo.kisi_ekle(-(i + 1), ad, None, durum=1)
+
+    def kurulum_gerekli(self):
+        return self.depo.meta("kurulum_tamam") != "1" and not self.demo
 
     # ---- ayarlar ve sessiz mod
     def ayar(self, k):
@@ -470,6 +483,21 @@ class Kutu:
         kimden = msg.get("from", {})
         ilk_ad = kimden.get("first_name") or ""
         k = self.depo.kisi_chat(chat_id)
+        metin = (msg.get("text") or "").strip()
+        davet = self.depo.meta("kurulum_davet")
+        if davet and metin == f"/start {davet}" and (k is None or k["durum"] == 0):
+            ad = self.depo.meta("kurulum_kisi_adi") or ilk_ad or "Ben"
+            tg_ad = " ".join(x for x in [ilk_ad, kimden.get("last_name")] if x) or kimden.get("username") or ad
+            if k is None:
+                kid = self.depo.kisi_ekle(chat_id, tg_ad, kimden.get("username"), durum=1, ad=ad)
+            else:
+                kid = k["id"]
+                self.depo.x("UPDATE kisiler SET durum=1, ad=? WHERE id=?", (ad, kid))
+            self.depo.meta("kurulum_ilk_kisi", kid)
+            log.info("kurulum: ilk kişi eklendi: %s (%s)", ad, chat_id)
+            await self.metin(chat_id, self.m("onaylandi"))
+            await self.yayinla({"tur": "kisiler"})
+            return
         if k is None:
             tam = " ".join(x for x in [ilk_ad, kimden.get("last_name")] if x) or kimden.get("username") or "Bilinmeyen"
             self.depo.kisi_ekle(chat_id, tam, kimden.get("username"))
@@ -600,6 +628,9 @@ async def durum(req):
         "hatirlat_dakika": float(b.ayar("hatirlat_dakika")), "surum": SURUM,
         "cevrimici": b.cevrimici, "demo": b.demo, "neden": b.neden,
         "kisiler": [kisi_json(k, sayi.get(k["id"], 0)) for k in kisiler],
+        "kurulum": ({"kod": b.depo.meta("kurulum_kodu"), "adres": kurulum_adresi(b), "ip": yerel_ip(b)}
+                    if b.kurulum_gerekli() else None),
+        "wifi": wifi_durumu(b),
     })
 
 
@@ -920,6 +951,9 @@ async def ekran_yonu_uygula():
     return p.returncode == 0, out.decode(errors="replace").strip()
 
 
+DEPO_ADRESI = "https://github.com/ekremcet/raspberrytime.git"
+
+
 def depo_klasoru():
     r = pathlib.Path(os.environ.get("MESAJKUTUSU_REPO") or pathlib.Path.home() / "raspberrytime")
     return r if (r / ".git").exists() else None
@@ -937,8 +971,10 @@ async def y_ses(req):
         try:
             if veri.get("hoparlor") is not None:
                 await komut("wpctl", "set-default", str(int(veri["hoparlor"])))
+                kutu(req).ayar_yaz("ses_otomatik", "0")
             if veri.get("mikrofon") is not None:
                 await komut("wpctl", "set-default", str(int(veri["mikrofon"])))
+                kutu(req).ayar_yaz("ses_otomatik", "0")
             for anahtar, hedef in (("ses", "@DEFAULT_AUDIO_SINK@"), ("mik_ses", "@DEFAULT_AUDIO_SOURCE@")):
                 if veri.get(anahtar) is not None:
                     x = max(0, min(100, int(veri[anahtar])))
@@ -991,17 +1027,7 @@ async def y_guvenlik(req):
         if "bot_token" in veri:
             tok = str(veri["bot_token"]).strip()
             if tok:
-                if not re.fullmatch(r"\d{5,}:[A-Za-z0-9_-]{30,}", tok):
-                    raise web.HTTPBadRequest(text="Anahtar 123456789:AAH... biçiminde olmalı")
-                try:
-                    async with ClientSession(connector=TCPConnector(resolver=ThreadedResolver())) as o:
-                        async with o.get(f"{b.cfg['TELEGRAM_API'].rstrip('/')}/bot{tok}/getMe",
-                                         timeout=ClientTimeout(total=15)) as r:
-                            sonuc = await r.json()
-                except Exception:
-                    raise web.HTTPBadRequest(text="Telegram'a ulaşılamadı, anahtar denenemedi")
-                if not sonuc.get("ok"):
-                    raise web.HTTPBadRequest(text="Telegram bu anahtarı kabul etmedi")
+                await anahtar_dene(b, tok)
                 b.depo.meta("gizli_bot_token", tok)
             else:
                 b.depo.x("DELETE FROM meta WHERE k='gizli_bot_token'")
@@ -1053,13 +1079,26 @@ async def y_sistem(req):
     if req.method == "POST":
         islem = (await req.json()).get("islem")
         repo = depo_klasoru()
-        if islem == "denetle":
+        if islem in ("denetle", "guncelle") and not repo:
+            # Hazır imajda ya da SD kart kurulumunda kaynak kod henüz yoksa bir kez klonla
+            hedef = pathlib.Path(os.environ.get("MESAJKUTUSU_REPO") or pathlib.Path.home() / "raspberrytime")
+            kod, out = await komut("git", "clone", "--quiet", DEPO_ADRESI, str(hedef), sure=120)
+            repo = depo_klasoru()
             if not repo:
-                raise web.HTTPBadRequest(text="Depo yok: Pi'de bir kez 'git clone https://github.com/ekremcet/raspberrytime ~/raspberrytime' çalıştır")
+                raise web.HTTPBadRequest(text="Kaynak kod indirilemedi: " + out[:160])
+        if islem == "denetle":
             kod, out = await komut("git", "-C", str(repo), "fetch", "--quiet", "origin", sure=40)
             if kod != 0:
                 raise web.HTTPBadRequest(text="GitHub'a ulaşılamadı: " + out[:120])
-            kod, out = await komut("git", "-C", str(repo), "log", "--format=%s", "HEAD..@{u}")
+            # Kurulu sürüm: guncelle.sh / imaj üretimi uygulamanın yanına SURUM dosyası (commit) bırakır
+            kurulu = "HEAD"
+            try:
+                c = (BASE / "SURUM").read_text().strip()
+                if c and (await komut("git", "-C", str(repo), "cat-file", "-e", c + "^{commit}"))[0] == 0:
+                    kurulu = c
+            except OSError:
+                pass
+            kod, out = await komut("git", "-C", str(repo), "log", "--format=%s", f"{kurulu}..@{{u}}")
             yeniler = [x for x in out.splitlines() if x.strip()] if kod == 0 else []
             return web.json_response({**await sistem_bilgisi(b), "yeniler": yeniler})
         if islem == "guncelle":
@@ -1087,6 +1126,246 @@ async def y_sistem(req):
     return web.json_response(await sistem_bilgisi(b))
 
 
+# ------------------------------------------------------- kurulum sihirbazı
+def yerel_ip(b):
+    """Kutunun ev ağındaki adresi (telefonun açacağı adres)."""
+    w = wifi_durumu(b)
+    if w and w.get("mod") == "hotspot":
+        return w.get("ip") or "10.42.0.1"
+    try:
+        s_ = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s_.connect(("1.1.1.1", 80))          # paket gitmez; yalnızca çıkış arayüzünü seçer
+        ip = s_.getsockname()[0]
+        s_.close()
+        return ip
+    except OSError:
+        return socket.gethostname() + ".local"
+
+
+def kurulum_adresi(b):
+    return f"http://{yerel_ip(b)}:{b.cfg['PORT']}/kurulum?k={b.depo.meta('kurulum_kodu') or ''}"
+
+
+def wifi_durumu(b):
+    """Wi-Fi yardımcısının (root servisi) yazdığı durum: bagli / hotspot / baglaniyor. Yoksa None."""
+    try:
+        return json.loads((pathlib.Path(b.cfg["WIFI_KLASORU"]) / "wifi.json").read_text())
+    except (OSError, ValueError):
+        return None
+
+
+KURULUM_HATA = {
+    "bitti": ("Kurulum tamamlanmış. Ayarlar için yönetim sayfasını kullan.", "Setup is already complete. Use the admin page."),
+    "kod": ("Kurulum kodu hatalı. Kutunun ekranındaki kodu gir.", "Wrong setup code. Enter the code shown on the box."),
+    "ad": ("Kutuda görünecek adını yaz (örn. Baba)", "Type the name the box should show for you (e.g. Dad)"),
+    "pin": ("PIN 4–12 rakam olmalı", "The PIN must be 4–12 digits"),
+    "bicim": ("Anahtar 123456789:AAH... biçiminde olmalı (BotFather'ın verdiği uzun satır)",
+              "The token looks like 123456789:AAH... (the long line BotFather sends)"),
+    "ulasilamadi": ("Telegram'a ulaşılamadı. Kutunun internete bağlı olduğundan emin ol.",
+                    "Couldn't reach Telegram. Make sure the box is online."),
+    "red": ("Telegram bu anahtarı kabul etmedi. BotFather'dan kopyaladığın satırı kontrol et.",
+            "Telegram rejected this token. Check the line you copied from BotFather."),
+    "anahtar_once": ("Önce bot anahtarını kaydet", "Save the bot token first"),
+    "wifi": ("Ağ adı boş olamaz; Wi-Fi şifresi 8–63 karakter olmalı", "Network name can't be empty; Wi-Fi passwords are 8–63 characters"),
+    "yardimci": ("Wi-Fi yardımcısı çalışmıyor", "The Wi-Fi helper isn't running"),
+}
+
+
+def kh(req, anahtar):
+    """Kurulum hata metni, telefondaki sihirbazın diline göre."""
+    tr, en = KURULUM_HATA[anahtar]
+    return en if req is not None and req.headers.get("X-Dil") == "en" else tr
+
+
+def kurulum_yetki(req):
+    b = kutu(req)
+    if not b.kurulum_gerekli():
+        raise web.HTTPForbidden(text=kh(req, "bitti"))
+    kod = (req.headers.get("X-Kurulum-Kodu") or req.query.get("k") or "").strip().upper()
+    if not kod or kod != (b.depo.meta("kurulum_kodu") or ""):
+        raise web.HTTPUnauthorized(text=kh(req, "kod"))
+    return b
+
+
+async def kurulum_sayfasi(req):
+    b = kutu(req)
+    if not b.kurulum_gerekli():
+        raise web.HTTPFound("/yonetim")
+    return web.FileResponse(BASE / "static" / "kurulum.html", headers={"Cache-Control": "no-cache"})
+
+
+async def k_durum(req):
+    b = kurulum_yetki(req)
+    ilk = b.depo.meta("kurulum_ilk_kisi")
+    ilk_k = b.depo.kisi(int(ilk)) if ilk else None
+    w = wifi_durumu(b) or {}
+    aglar = []
+    try:
+        aglar = json.loads((pathlib.Path(b.cfg["WIFI_KLASORU"]) / "aglar.json").read_text())
+    except (OSError, ValueError):
+        pass
+    return web.json_response({
+        "kutu_adi": b.ayar("kutu_adi"), "cocuk_adi": b.ayar("cocuk_adi"), "dil": b.ayar("dil"),
+        "kisi_adi": b.depo.meta("kurulum_kisi_adi") or "",
+        "genel_tamam": b.depo.meta("kurulum_genel") == "1",
+        "pin_tamam": bool(b.depo.meta("gizli_pin")),
+        "token_var": bool(b.token), "bot": b.bot_kullanici, "cevrimici": b.cevrimici and bool(b.token),
+        "davet": (f"https://t.me/{b.bot_kullanici}?start={b.depo.meta('kurulum_davet')}" if b.bot_kullanici else None),
+        "ilk_kisi": ilk_k["ad"] if ilk_k else None,
+        "wifi": w, "aglar": aglar, "wifi_yardimci": (pathlib.Path(b.cfg["WIFI_KLASORU"]) / "wifi.json").exists(),
+    })
+
+
+async def k_genel(req):
+    b = kurulum_yetki(req)
+    veri = await req.json()
+    try:
+        temiz = {k: ayar_dogrula(k, veri.get(k)) for k in ("kutu_adi", "cocuk_adi", "dil") if k in veri}
+    except ValueError as e:
+        raise web.HTTPBadRequest(text=str(e))
+    kisi_adi = str(veri.get("kisi_adi") or "").strip()[:30]
+    if not kisi_adi:
+        raise web.HTTPBadRequest(text=kh(req, "ad"))
+    for k, v in temiz.items():
+        b.ayar_yaz(k, v)
+    b.depo.meta("kurulum_kisi_adi", kisi_adi)
+    b.depo.meta("kurulum_genel", "1")
+    await b.yayinla({"tur": "ayarlar"})
+    return web.json_response({"ok": True})
+
+
+async def k_pin(req):
+    b = kurulum_yetki(req)
+    pin = str((await req.json()).get("pin") or "").strip()
+    if not re.fullmatch(r"\d{4,12}", pin):
+        raise web.HTTPBadRequest(text=kh(req, "pin"))
+    b.depo.meta("gizli_pin", pin)
+    b.pin = pin
+    return web.json_response({"ok": True})
+
+
+async def anahtar_dene(b, tok, req=None):
+    """Telegram'a getMe sorar; geçerliyse bot kullanıcı adını döndürür, değilse HTTPBadRequest."""
+    if not re.fullmatch(r"\d{5,}:[A-Za-z0-9_-]{30,}", tok):
+        raise web.HTTPBadRequest(text=kh(req, "bicim"))
+    try:
+        async with ClientSession(connector=TCPConnector(resolver=ThreadedResolver())) as o:
+            async with o.post(f"{b.cfg['TELEGRAM_API'].rstrip('/')}/bot{tok}/getMe",
+                             timeout=ClientTimeout(total=15)) as r:
+                sonuc = await r.json()
+    except Exception:
+        raise web.HTTPBadRequest(text=kh(req, "ulasilamadi"))
+    if not sonuc.get("ok"):
+        raise web.HTTPBadRequest(text=kh(req, "red"))
+    return sonuc["result"].get("username")
+
+
+async def k_token(req):
+    b = kurulum_yetki(req)
+    tok = str((await req.json()).get("bot_token") or "").strip()
+    kullanici = await anahtar_dene(b, tok, req)
+    b.depo.meta("gizli_bot_token", tok)
+    log.info("kurulum: bot anahtarı kaydedildi (@%s), yeniden başlatılıyor", kullanici)
+    yeniden_baslat_sonra(1.5)
+    return web.json_response({"ok": True, "bot": kullanici})
+
+
+async def k_demo(req):
+    b = kurulum_yetki(req)
+    b.depo.meta("demo", "1")
+    b.depo.meta("kurulum_tamam", "1")
+    yeniden_baslat_sonra(1.0)
+    return web.json_response({"ok": True})
+
+
+async def k_bitir(req):
+    b = kurulum_yetki(req)
+    if not b.token:
+        raise web.HTTPBadRequest(text=kh(req, "anahtar_once"))
+    b.depo.meta("kurulum_tamam", "1")
+    log.info("kurulum tamamlandı")
+    await b.yayinla({"tur": "ayarlar"})
+    return web.json_response({"ok": True})
+
+
+async def k_wifi(req):
+    """Telefondan seçilen ev Wi-Fi'sini yardımcı servise iletir (yardımcı root olarak bağlanır)."""
+    b = kurulum_yetki(req) if b_kurulum_gerekli(req) else _yonetici_dondur(req)
+    veri = await req.json()
+    ssid = str(veri.get("ssid") or "").strip()
+    sifre = str(veri.get("sifre") or "")
+    if not ssid or len(ssid) > 32 or (sifre and not 8 <= len(sifre) <= 63):
+        raise web.HTTPBadRequest(text=kh(req, "wifi"))
+    d = pathlib.Path(b.cfg["WIFI_KLASORU"])
+    if not (d / "wifi.json").exists():
+        raise web.HTTPBadRequest(text=kh(req, "yardimci"))
+    gecici = d / "wifi-istek.json.tmp"
+    gecici.write_text(json.dumps({"ssid": ssid, "sifre": sifre}))
+    gecici.chmod(0o600)
+    gecici.rename(d / "wifi-istek.json")
+    return web.json_response({"ok": True})
+
+
+def b_kurulum_gerekli(req):
+    return kutu(req).kurulum_gerekli()
+
+
+def _yonetici_dondur(req):
+    yonetici(req)
+    return kutu(req)
+
+
+async def y_wifi(req):
+    yonetici(req)
+    b = kutu(req)
+    d = pathlib.Path(b.cfg["WIFI_KLASORU"])
+    try:
+        aglar = json.loads((d / "aglar.json").read_text())
+    except (OSError, ValueError):
+        aglar = []
+    w = wifi_durumu(b)
+    if w:
+        w = {k: v for k, v in w.items() if k != "hotspot_sifre"}
+    return web.json_response({"yardimci": (d / "wifi.json").exists(), "wifi": w, "aglar": aglar})
+
+
+async def k_ekran_cevir(req):
+    """Kurulum ekranındaki "Ekran ters mi?" düğmesi (yalnızca cihazın kendisinden, kurulum sırasında)."""
+    yerel_mi(req)
+    b = kutu(req)
+    if not b.kurulum_gerekli():
+        raise web.HTTPForbidden()
+    b.ayar_yaz("ekran_yonu", "0" if b.ayar("ekran_yonu") == "180" else "180")
+    asyncio.create_task(ekran_yonu_uygula())
+    return web.json_response({"ekran_yonu": b.ayar("ekran_yonu")})
+
+
+# --------------------------------------------- USB ses aygıtlarını otomatik seç
+async def ses_otomatik_sec(b):
+    if b.ayar("ses_otomatik") != "1":
+        return
+    d = await ses_durumu()
+    if not d.get("var"):
+        return
+    for liste, secili, ad in ((d["hoparlorler"], d["hoparlor"], "hoparlör"), (d["mikrofonlar"], d["mikrofon"], "mikrofon")):
+        usb = [c for c in liste if "usb" in (c.get("isim") or "").lower()]
+        simdiki = next((c for c in liste if c["id"] == secili), None)
+        if usb and (simdiki is None or "usb" not in (simdiki.get("isim") or "").lower()):
+            kod, _ = await komut("wpctl", "set-default", str(usb[0]["id"]))
+            if kod == 0:
+                log.info("ses: USB %s varsayılan yapıldı: %s", ad, usb[0]["ad"])
+
+
+async def ses_otomatik_dongusu(b):
+    await asyncio.sleep(8)
+    while True:
+        try:
+            await ses_otomatik_sec(b)
+        except Exception as e:          # ses sistemi yoksa sessizce geç
+            log.debug("ses otomatik: %s", e)
+        await asyncio.sleep(30)
+
+
 def statik(ad):
     async def h(req):
         return web.FileResponse(BASE / "static" / ad, headers={"Cache-Control": "no-cache"})
@@ -1099,6 +1378,8 @@ async def baslangic(app):
         log.error("ffmpeg bulunamadı! Kurulum: sudo apt install ffmpeg  (Mac: brew install ffmpeg)")
     if b.demo:
         log.warning("BOT_TOKEN yok: DEMO modunda çalışıyor (Telegram'a bağlanmıyor).")
+    elif not b.token:
+        log.warning("Kurulum bekleniyor: telefondan %s adresini aç (kod: %s)", kurulum_adresi(b), b.depo.meta("kurulum_kodu"))
     else:
         app["oturum"] = ClientSession(connector=TCPConnector(resolver=ThreadedResolver()))
         b.tg = Telegram(b.token, b.cfg["TELEGRAM_API"].rstrip("/"), app["oturum"])
@@ -1107,6 +1388,7 @@ async def baslangic(app):
         for m in b.depo.q("SELECT id FROM mesajlar WHERE yon='giden' AND durum IN ('bekliyor','hata')"):
             b.gorevler.append(asyncio.create_task(b.teslim_et(m["id"])))
     b.gorevler.append(asyncio.create_task(b.parlaklik_dongusu()))
+    b.gorevler.append(asyncio.create_task(ses_otomatik_dongusu(b)))
     port = b.cfg["PORT"]
     log.info("Çocuk ekranı:  http://localhost:%s/", port)
     log.info("Yönetim:       http://<bu-cihazın-adresi>:%s/yonetim   PIN: %s", port, b.pin)
@@ -1156,6 +1438,16 @@ def uygulama(cfg=None):
         web.get("/api/yonetim/sistem", y_sistem),
         web.post("/api/yonetim/sistem", y_sistem),
         web.post("/api/ekran", ekran_bildirim),
+        web.get("/kurulum", kurulum_sayfasi),
+        web.get("/api/kurulum/durum", k_durum),
+        web.post("/api/kurulum/genel", k_genel),
+        web.post("/api/kurulum/pin", k_pin),
+        web.post("/api/kurulum/token", k_token),
+        web.post("/api/kurulum/demo", k_demo),
+        web.post("/api/kurulum/bitir", k_bitir),
+        web.post("/api/kurulum/wifi", k_wifi),
+        web.post("/api/kurulum/ekran_cevir", k_ekran_cevir),
+        web.get("/api/yonetim/wifi", y_wifi),
     ])
     app.on_startup.append(baslangic)
     app.on_cleanup.append(kapanis)

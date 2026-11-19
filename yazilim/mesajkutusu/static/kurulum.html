@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mesaj Kutusu – Kurulum</title>
+<style>
+:root {
+  --bg: #F3F5F9; --card: #FFFFFF; --ink: #1B2230; --muted: #5C667A; --line: #DDE2EA;
+  --accent: #2F6FED; --accent-ink: #fff; --soft: #E6EEFE; --warn-bg: #FFF3DD; --warn: #6B4100; --danger: #C42B31; --ok: #2E9E5B;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #10141B; --card: #171C25; --ink: #E7EBF2; --muted: #9DA8BA; --line: #2A3242; --accent: #6F9CFF; --accent-ink: #0B1220; --soft: #1C2A47; --warn-bg: #2C2213; --warn: #F6CF8A; --danger: #FF6B70; --ok: #5CC98A; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-size: 16px; line-height: 1.5; }
+[hidden] { display: none !important; }
+main { max-width: 560px; margin: 0 auto; padding: 20px 16px 48px; display: flex; flex-direction: column; gap: 16px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+h1 { font-size: 22px; margin: 0; }
+h2 { font-size: 20px; margin: 0 0 4px; }
+.ilerleme { display: flex; gap: 6px; }
+.ilerleme i { flex: 1; height: 6px; border-radius: 3px; background: var(--line); }
+.ilerleme i.tamam { background: var(--accent); }
+.kart { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.alt { color: var(--muted); font-size: 14px; margin: 0; }
+label.alan { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--muted); }
+input, select, button { font: inherit; color: inherit; }
+input, select { min-height: 48px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; font-size: 16px; }
+input.kod { text-transform: uppercase; letter-spacing: .3em; font-family: ui-monospace, Menlo, monospace; font-size: 22px; text-align: center; }
+button, a.dugme { text-align: center; min-height: 48px; padding: 0 18px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; color: var(--ink); }
+button.ana, a.dugme.ana { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+button:disabled { opacity: .55; cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.dugmeler { display: flex; gap: 10px; flex-wrap: wrap; }
+.dugmeler > .ana { flex: 1; }
+.hata { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+.not { background: var(--warn-bg); color: var(--warn); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+.tamam-not { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); border-radius: 10px; padding: 10px 12px; font-size: 14px; font-weight: 600; }
+ol.adimlar { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 8px; }
+code { font-family: ui-monospace, Menlo, monospace; background: var(--soft); padding: 1px 6px; border-radius: 6px; font-size: 14px; }
+.dil { display: flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.dil button { min-height: 34px; border: none; border-radius: 0; padding: 0 12px; font-size: 14px; }
+.dil button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.aglar { display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; }
+.aglar button { justify-content: space-between; font-weight: 600; }
+.aglar button[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.bekle { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; }
+.bekle::before { content: ""; width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--accent); animation: don 1s linear infinite; flex: none; }
+@keyframes don { to { transform: rotate(360deg); } }
+.kucuk-link { background: none; border: none; color: var(--muted); font-weight: 500; font-size: 14px; text-decoration: underline; min-height: 36px; padding: 0; }
+.buyuk-ok { font-size: 44px; line-height: 1; text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1 id="baslik">Mesaj Kutusu</h1>
+    <div class="dil" role="group" aria-label="Dil / Language">
+      <button data-dil="tr" aria-pressed="true">TR</button><button data-dil="en" aria-pressed="false">EN</button>
+    </div>
+  </header>
+  <div class="ilerleme" id="ilerleme" aria-hidden="true"></div>
+  <section class="kart" id="adim"></section>
+</main>
+<script>
+(function () {
+"use strict";
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+const METIN = {
+  tr: {
+    baslik: "Kutuyu kur",
+    kod_b: "Kurulum kodu", kod_a: "Kutunun ekranında 6 haneli bir kod var. Onu yaz.", kod_y: "Kod", devam: "Devam", geri: "Geri",
+    wifi_b: "Evinin Wi-Fi'si", wifi_a: "Kutu internete bağlanamadı. Evinin ağını seç ve şifresini yaz.",
+    wifi_sifre: "Wi-Fi şifresi", wifi_hata: "Son denemede bağlanamadı; şifre yanlış olabilir.", wifi_bagla: "Bağlan", wifi_tara: "Ağ bulunamadı. Ağ adını elle yaz:", wifi_ad: "Ağ adı",
+    wifi_gidiyor: "Kutu evinin ağına bağlanıyor. Bu telefon kutunun ağından düşecek; bu normal.",
+    wifi_sonra: "Telefonunu da evinin Wi-Fi'sine bağla, sonra kutunun ekranında çıkan YENİ kodu okutup kuruluma devam et. Ekranda yine \"Wi-Fi'ye bağlanamadım\" yazarsa şifre yanlıştır; baştan dene.",
+    genel_b: "Kutu ve sen", genel_a: "Bu adlar kutunun ekranında ve Telegram mesajlarında görünür.",
+    kutu_adi: "Kutunun adı", cocuk_adi: "Çocuğun adı (Telegram'da \"… dinledi\" gibi yerlerde)", kisi_adi: "Kutuda senin adın (örn. Baba, Anne)",
+    dil_y: "Kutunun dili", kutu_ornek: "Mesaj Kutusu",
+    pin_b: "Yönetici PIN'i", pin_a: "Kişileri onaylamak ve ayarları değiştirmek için bu PIN'i soracağız. 4–12 rakam.",
+    pin_y: "Yeni PIN", pin_t: "PIN'i tekrar yaz", pin_ayni: "İki PIN aynı değil",
+    bot_b: "Telegram botu", bot_a: "Aile mesajları kutuya bir Telegram botu üzerinden gelir. Botu 1 dakikada sen oluşturursun:",
+    bot_1: "Telegram'da <b>@BotFather</b>'ı aç", bot_ac: "BotFather'ı aç",
+    bot_2: "<code>/newbot</code> yaz, bota bir ad ver (örn. <i>Kutu</i>)",
+    bot_3: "Kullanıcı adı ver; sonu <code>bot</code> ile bitmeli (örn. <i>ailekutusu_bot</i>)",
+    bot_4: "BotFather'ın verdiği uzun anahtarı kopyala ve aşağı yapıştır",
+    bot_y: "Bot anahtarı", bot_ornek: "123456789:AAH…", bot_kaydet: "Anahtarı kaydet",
+    bot_bekle: "Anahtar doğru. Kutu Telegram'a bağlanıyor…", demo: "Telegram olmadan denemek istiyorum (demo)",
+    demo_onay: "Demo modunda kutu Telegram'a bağlanmaz, örnek kişilerle açılır. Sonra yönetim sayfasından anahtar ekleyebilirsin. Devam edilsin mi?",
+    davet_b: "Kendini ekle", davet_a: "Şimdi Telegram'dan kutuya bağlan. Düğmeye bas, Telegram açılınca <b>Başlat</b>'a dokun.",
+    davet_ac: "Telegram'da aç", davet_bekle: "Telegram'da Başlat'a basmanı bekliyorum…",
+    davet_kopya: "Telefonunda Telegram yoksa bu bağlantıyı Telegram'ın olduğu cihazda aç:",
+    bitti_b: "Hazır!", bitti_a: "{ad} kutuda göründü. Artık sesli mesaj gönderebilirsin.",
+    bitti_aile: "Aileyi eklemek için onlara bu bağlantıyı gönder. Botu başlattıklarında yönetim sayfasında onayını bekleyecekler:",
+    bitti_dugme: "Bitir ve yönetim sayfasına geç",
+    hata_ag: "Kutuya ulaşılamadı. Telefon kutuyla aynı Wi-Fi'de mi?",
+    tamamlandi: "Kurulum tamamlanmış. Yönetim sayfasına gidiliyor…",
+  },
+  en: {
+    baslik: "Set up the box",
+    kod_b: "Setup code", kod_a: "The box's screen shows a 6-character code. Type it here.", kod_y: "Code", devam: "Continue", geri: "Back",
+    wifi_b: "Your home Wi-Fi", wifi_a: "The box couldn't get online. Pick your home network and type its password.",
+    wifi_sifre: "Wi-Fi password", wifi_hata: "The last attempt failed; the password may be wrong.", wifi_bagla: "Connect", wifi_tara: "No networks found. Type the network name:", wifi_ad: "Network name",
+    wifi_gidiyor: "The box is joining your home network. This phone will drop off the box's network; that's expected.",
+    wifi_sonra: "Reconnect your phone to your home Wi-Fi, then scan the NEW code on the box's screen to continue. If the screen still says \"I can't reach the Wi-Fi\", the password was wrong; try again.",
+    genel_b: "The box and you", genel_a: "These names appear on the box and in Telegram messages.",
+    kutu_adi: "Box name", cocuk_adi: "Child's name (used in \"… listened\" replies)", kisi_adi: "Your name on the box (e.g. Dad, Mum)",
+    dil_y: "Box language", kutu_ornek: "Message Box",
+    pin_b: "Admin PIN", pin_a: "You'll need this PIN to approve people and change settings. 4–12 digits.",
+    pin_y: "New PIN", pin_t: "Repeat the PIN", pin_ayni: "The PINs don't match",
+    bot_b: "Telegram bot", bot_a: "Family messages reach the box through a Telegram bot. You create it in a minute:",
+    bot_1: "Open <b>@BotFather</b> in Telegram", bot_ac: "Open BotFather",
+    bot_2: "Send <code>/newbot</code> and give the bot a name (e.g. <i>Box</i>)",
+    bot_3: "Pick a username ending in <code>bot</code> (e.g. <i>familybox_bot</i>)",
+    bot_4: "Copy the long token BotFather sends and paste it below",
+    bot_y: "Bot token", bot_ornek: "123456789:AAH…", bot_kaydet: "Save token",
+    bot_bekle: "Token accepted. The box is connecting to Telegram…", demo: "Try it without Telegram (demo)",
+    demo_onay: "In demo mode the box doesn't connect to Telegram and starts with sample people. You can add a token later from the admin page. Continue?",
+    davet_b: "Add yourself", davet_a: "Now connect to the box from Telegram. Tap the button and press <b>Start</b> when Telegram opens.",
+    davet_ac: "Open in Telegram", davet_bekle: "Waiting for you to press Start in Telegram…",
+    davet_kopya: "No Telegram on this phone? Open this link on a device that has it:",
+    bitti_b: "All set!", bitti_a: "{ad} is now on the box. You can send voice messages.",
+    bitti_aile: "To add family, send them this link. Once they start the bot they'll wait for your approval on the admin page:",
+    bitti_dugme: "Finish and open the admin page",
+    hata_ag: "Can't reach the box. Is the phone on the same Wi-Fi?",
+    tamamlandi: "Setup is already complete. Opening the admin page…",
+  },
+};
+let dil = (navigator.language || "tr").toLowerCase().startsWith("tr") ? "tr" : "en";
+const t = (k, v = {}) => (METIN[dil][k] || METIN.tr[k] || k).replace(/\{(\w+)\}/g, (_, a) => esc(v[a]));
+
+let KOD = (new URLSearchParams(location.search).get("k") || "").toUpperCase();
+try { KOD = KOD || sessionStorage.getItem("kurulum-kod") || ""; } catch (e) {}
+let S = null, adim = null, elle = null, mesgul = false, hataMetni = "", wifiGitti = false, botBekle = false, pinGecici = "";
+
+async function api(yol, govde) {
+  const r = await fetch("/api/kurulum/" + yol, {
+    method: govde === undefined ? "GET" : "POST",
+    headers: { "X-Kurulum-Kodu": KOD, "X-Dil": dil, "Content-Type": "application/json" },
+    body: govde === undefined ? undefined : JSON.stringify(govde),
+  });
+  if (r.status === 403) { $("adim").innerHTML = `<p>${t("tamamlandi")}</p>`; setTimeout(() => location.href = "/yonetim", 1200); throw new Error("bitti"); }
+  if (!r.ok) { const e = new Error(await r.text()); e.durum = r.status; throw e; }
+  return r.json();
+}
+
+const SIRA = ["wifi", "genel", "pin", "bot", "davet", "bitti"];
+function otomatikAdim() {
+  if (!S) return "kod";
+  if (S.wifi && S.wifi.mod === "hotspot" && !wifiGitti) return "wifi";
+  if (wifiGitti) return "wifi";
+  if (!S.genel_tamam) return "genel";
+  if (!S.pin_tamam) return "pin";
+  if (!S.token_var || !S.bot) return "bot";
+  if (!S.ilk_kisi) return "davet";
+  return "bitti";
+}
+
+async function yenile() {
+  if (!KOD) { S = null; ciz(); return; }
+  try {
+    S = await api("durum");
+    // Wi-Fi denemesinden sonra telefon kutuya yeniden ulaşabiliyorsa (kurulum ağına geri döndüyse ya da aynı ağdaysa) devam et
+    if (wifiGitti && Date.now() - wifiGitti > 15000 && S.wifi && S.wifi.mod !== "baglaniyor") wifiGitti = false;
+    try { sessionStorage.setItem("kurulum-kod", KOD); } catch (e) {}
+  } catch (e) {
+    if (e.message === "bitti") return;
+    if (e.durum === 401) { S = null; KOD = ""; hataMetni = e.message; try { sessionStorage.removeItem("kurulum-kod"); } catch (x) {} }
+    else if (!wifiGitti && !botBekle) hataMetni = t("hata_ag");
+  }
+  ciz();
+}
+
+function ilerlemeCiz(a) {
+  const i = Math.max(0, SIRA.indexOf(a)), adimlar = SIRA.filter(x => x !== "wifi" || (S && S.wifi_yardimci && S.wifi && S.wifi.mod === "hotspot"));
+  const j = adimlar.indexOf(a);
+  $("ilerleme").innerHTML = adimlar.map((_, k) => `<i class="${k <= j ? "tamam" : ""}"></i>`).join("");
+  return i;
+}
+
+function ciz() {
+  const a = elle || otomatikAdim();
+  // Yoklama yalnızca adım (ya da bekleme durumu) değişince yeniden çizer; yazılan alanlar silinmez.
+  const anahtar = [a, dil, hataMetni, !!wifiGitti, S && S.wifi && S.wifi.hata, botBekle || !!(S && S.token_var && !S.bot), S && S.bot, S && S.ilk_kisi, (S && S.aglar || []).length].join("|");
+  if (mesgul || (a === adim && anahtar === ciz.son)) return;
+  ciz.son = anahtar; adim = a; ilerlemeCiz(a);
+  document.documentElement.lang = dil; $("baslik").textContent = t("baslik");
+  document.querySelectorAll("[data-dil]").forEach(b => b.setAttribute("aria-pressed", b.dataset.dil === dil));
+  const h = hataMetni ? `<div class="hata" role="alert">${esc(hataMetni)}</div>` : "";
+  const k = $("adim");
+  if (a === "kod") {
+    k.innerHTML = `<h2>${t("kod_b")}</h2><p class="alt">${t("kod_a")}</p>${h}
+      <label class="alan">${t("kod_y")}<input id="kod" class="kod" maxlength="6" autocomplete="off" autocapitalize="characters" inputmode="text" value="${esc(KOD)}"></label>
+      <div class="dugmeler"><button class="ana" id="ileri">${t("devam")}</button></div>`;
+    $("ileri").onclick = () => { KOD = $("kod").value.trim().toUpperCase(); hataMetni = ""; yenile(); };
+    $("kod").onkeydown = e => { if (e.key === "Enter") $("ileri").click(); };
+  } else if (a === "wifi") {
+    if (wifiGitti) {
+      k.innerHTML = `<h2>${t("wifi_b")}</h2><div class="tamam-not">${t("wifi_gidiyor")}</div><p>${t("wifi_sonra")}</p><div class="buyuk-ok">📶</div>`;
+    } else {
+      const aglar = (S.aglar || []).filter(x => x.ssid);
+      const wh = S.wifi && S.wifi.hata ? `<div class="hata" role="alert">${t("wifi_hata")}</div>` : "";
+      k.innerHTML = `<h2>${t("wifi_b")}</h2><p class="alt">${t("wifi_a")}</p>${h}${wh}
+        ${aglar.length ? `<div class="aglar" id="aglar">${aglar.map((x, i) => `<button data-i="${i}" aria-pressed="false"><span>${esc(x.ssid)}</span><span class="alt">${x.guvenli ? "🔒 " : ""}${"▂▄▆█".slice(0, Math.max(1, Math.round((x.sinyal || 50) / 25)))}</span></button>`).join("")}</div>`
+          : `<label class="alan">${t("wifi_tara")}<input id="ssid" autocomplete="off" autocapitalize="none"></label>`}
+        <label class="alan">${t("wifi_sifre")}<input id="wsifre" type="password" autocomplete="off"></label>
+        <div class="dugmeler"><button class="ana" id="ileri">${t("wifi_bagla")}</button></div>`;
+      let secili = aglar.length ? null : undefined;
+      if (aglar.length) $("aglar").onclick = e => { const b = e.target.closest("button"); if (!b) return; secili = aglar[+b.dataset.i].ssid;
+        $("aglar").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); $("wsifre").focus(); };
+      $("ileri").onclick = async () => {
+        const ssid = secili ?? ($("ssid") ? $("ssid").value.trim() : "");
+        if (!ssid) return;
+        await gonder("wifi", { ssid, sifre: $("wsifre").value }, () => { wifiGitti = Date.now(); });
+      };
+    }
+  } else if (a === "genel") {
+    k.innerHTML = `<h2>${t("genel_b")}</h2><p class="alt">${t("genel_a")}</p>${h}
+      <label class="alan">${t("kisi_adi")}<input id="kisiAdi" maxlength="30" value="${esc(S.kisi_adi)}" autocomplete="given-name"></label>
+      <label class="alan">${t("cocuk_adi")}<input id="cocukAdi" maxlength="30" value="${esc(S.cocuk_adi)}"></label>
+      <label class="alan">${t("kutu_adi")}<input id="kutuAdi" maxlength="40" value="${esc(S.kutu_adi)}" placeholder="${t("kutu_ornek")}"></label>
+      <label class="alan">${t("dil_y")}<select id="kutuDil"><option value="tr">Türkçe</option><option value="en">English</option></select></label>
+      <div class="dugmeler"><button class="ana" id="ileri">${t("devam")}</button></div>`;
+    $("kutuDil").value = S.genel_tamam ? S.dil : dil;
+    $("ileri").onclick = () => gonder("genel", { kisi_adi: $("kisiAdi").value, cocuk_adi: $("cocukAdi").value,
+      kutu_adi: $("kutuAdi").value.trim() || t("kutu_ornek"), dil: $("kutuDil").value }, () => { elle = null; });
+  } else if (a === "pin") {
+    k.innerHTML = `<h2>${t("pin_b")}</h2><p class="alt">${t("pin_a")}</p>${h}
+      <label class="alan">${t("pin_y")}<input id="pin1" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="new-password"></label>
+      <label class="alan">${t("pin_t")}<input id="pin2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="new-password"></label>
+      <div class="dugmeler"><button id="geri">${t("geri")}</button><button class="ana" id="ileri">${t("devam")}</button></div>`;
+    $("geri").onclick = () => { elle = "genel"; hataMetni = ""; ciz(); };
+    $("ileri").onclick = () => {
+      if ($("pin1").value !== $("pin2").value) { hataMetni = t("pin_ayni"); ciz(); return; }
+      pinGecici = $("pin1").value;
+      gonder("pin", { pin: pinGecici }, () => { elle = null; try { sessionStorage.setItem("kutu-pin", pinGecici); } catch (e) {} });
+    };
+  } else if (a === "bot") {
+    if (botBekle || (S.token_var && !S.bot)) {
+      k.innerHTML = `<h2>${t("bot_b")}</h2><div class="bekle">${t("bot_bekle")}</div>`;
+    } else {
+      k.innerHTML = `<h2>${t("bot_b")}</h2><p class="alt">${t("bot_a")}</p>${h}
+        <ol class="adimlar"><li>${t("bot_1")}<br><a class="dugme" href="https://t.me/BotFather" target="_blank" rel="noopener" style="margin-top:6px">${t("bot_ac")}</a></li>
+        <li>${t("bot_2")}</li><li>${t("bot_3")}</li><li>${t("bot_4")}</li></ol>
+        <label class="alan">${t("bot_y")}<input id="token" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="${t("bot_ornek")}"></label>
+        <div class="dugmeler"><button id="geri">${t("geri")}</button><button class="ana" id="ileri">${t("bot_kaydet")}</button></div>
+        <button class="kucuk-link" id="demo">${t("demo")}</button>`;
+      $("geri").onclick = () => { elle = "pin"; hataMetni = ""; ciz(); };
+      $("ileri").onclick = () => gonder("token", { bot_token: $("token").value.trim() }, () => { botBekle = true; setTimeout(() => botBekle = false, 20000); });
+      $("demo").onclick = () => { if (confirm(t("demo_onay"))) gonder("demo", {}, () => setTimeout(() => location.href = "/yonetim", 4000)); };
+    }
+  } else if (a === "davet") {
+    k.innerHTML = `<h2>${t("davet_b")}</h2><p class="alt">${t("davet_a")}</p>${h}
+      <a class="dugme ana" href="${esc(S.davet)}" target="_blank" rel="noopener">${t("davet_ac")} · @${esc(S.bot)}</a>
+      <div class="bekle">${t("davet_bekle")}</div>
+      <p class="alt">${t("davet_kopya")}<br><code style="user-select:all;word-break:break-all">${esc(S.davet)}</code></p>`;
+  } else if (a === "bitti") {
+    const aile = `https://t.me/${S.bot}`;
+    k.innerHTML = `<div class="buyuk-ok">🎉</div><h2>${t("bitti_b")}</h2><p>${t("bitti_a", { ad: S.ilk_kisi })}</p>${h}
+      <p class="alt">${t("bitti_aile")}<br><code style="user-select:all">${esc(aile)}</code></p>
+      <div class="dugmeler"><button class="ana" id="ileri">${t("bitti_dugme")}</button></div>`;
+    $("ileri").onclick = () => gonder("bitir", {}, () => location.href = "/yonetim");
+  }
+  const ilk = k.querySelector("input:not([value]), input[value='']"); if (ilk && a !== "bitti" && a !== "kod") ilk.focus({ preventScroll: true });
+}
+
+async function gonder(yol, govde, sonra) {
+  if (mesgul) return; mesgul = true; hataMetni = "";
+  const b = $("ileri"); if (b) b.disabled = true;
+  try { await api(yol, govde); sonra && sonra(); }
+  catch (e) { if (e.message !== "bitti") hataMetni = e.message || t("hata_ag"); }
+  finally { mesgul = false; }
+  if (yol === "wifi" || yol === "demo") ciz(); else await yenile();
+}
+
+document.querySelectorAll("[data-dil]").forEach(b => b.onclick = () => { dil = b.dataset.dil; adim = null; ciz(); });
+yenile();
+setInterval(() => { if (!mesgul && adim !== "kod" && (!wifiGitti || Date.now() - wifiGitti > 15000)) yenile(); }, 3000);
+})();
+</script>
+</body>
+</html>

@@ -117,7 +117,7 @@ Pin 1 is the pin at the end of the GPIO header closest to the SD card; pins 2 an
 
 1. Lay the front frame face down (front face on the table).
 2. Place the display glass-down into the pocket. There is 0.5 mm of clearance on every side; it should drop in without force.
-3. Check that the cables pass freely through the notches in the pocket wall. If the picture is upside down at first boot, that's fine; it can be rotated in software ([software › 5](../yazilim/README.md#5-screen-orientation)).
+3. Check that the cables pass freely through the notches in the pocket wall. If the picture is upside down at first boot, that's fine; it can be rotated in software ([software › 4](../yazilim/README.md#4-screen-orientation)); the setup screen has an "Ekran ters mi?" (Screen upside down?) button.
 4. **Fix the screen with a glue pen** (instead of foam tape; the foam doesn't stay in place):
    1. Seat the display in its final position and check from the front that the active area is centered in the frame window.
    2. Apply glue in the corner between the **outer edge of the display's metal back frame** and the **inner face of the pocket wall**: 2 dots on each long side and 1 on each short side (6 in total), each 1–2 cm long.

@@ -7,6 +7,7 @@ Inspired by [button.box](https://button.box); it uses a 7" touchscreen instead o
 - Family members send ordinary Telegram voice messages; the box chimes, the person's tile glows, and the child presses play.
 - No reading or writing needed: the screen only shows photos and two big buttons (listen / talk).
 - No SIM card, phone line or app required. Only people you approve can reach the box.
+- Plug-and-play setup: flash the ready-made SD card image, power on, scan the QR code on the screen and finish everything (Wi-Fi, Telegram bot, PIN, yourself as the first contact) from your phone.
 
 ![Case](donanim/gorseller/kasa_onizleme.png)
 ![Interface](yazilim/gorseller/arayuz.png)
@@ -18,7 +19,8 @@ Inspired by [button.box](https://button.box); it uses a 7" touchscreen instead o
 | Folder | Contents |
 |---|---|
 | [`donanim/`](donanim/) (hardware) | Parts list, 3D-print files (STL), parametric case model (`kasa.py`), step-by-step assembly |
-| [`yazilim/`](yazilim/) (software) | The box software (`mesajkutusu/`), installation, Telegram bot, remote updates, troubleshooting |
+| [`yazilim/`](yazilim/) (software) | The box software (`mesajkutusu/`), installation, setup wizard, Telegram bot, remote updates, troubleshooting |
+| [`imaj/`](imaj/) (image) | pi-gen stage for the ready-made SD card image, built by [`.github/workflows/imaj.yml`](.github/workflows/imaj.yml) |
 
 ## Roadmap from start to finish
 
@@ -26,12 +28,11 @@ Inspired by [button.box](https://button.box); it uses a 7" touchscreen instead o
 |---|---|---|
 | 1 | Gather the parts | [hardware › 1. Parts list](donanim/README.md#1-parts-list) |
 | 2 | Print the case (small test piece first) | [hardware › 2. 3D printing](donanim/README.md#2-3d-printing) |
-| 3 | Create the Telegram bot | [software › 1. Telegram bot](yazilim/README.md#1-create-the-telegram-bot) |
-| 4 | Write and prepare the SD card | [software › 2–3](yazilim/README.md#2-write-the-sd-card-raspberry-pi-imager) |
-| 5 | Assemble the electronics and the case (glue the screen in, tape the cables) | [hardware › 3. Assembly](donanim/README.md#3-step-by-step-assembly) · [3.9 Cable management](donanim/README.md#39-cable-management) |
-| 6 | First boot, screen orientation, audio | [software › 4–6](yazilim/README.md#4-insert-the-card-and-power-on) |
-| 7 | Add yourself and the family | [software › 7–8](yazilim/README.md#7-admin-page-and-first-contact) |
-| 8 | Remote maintenance and updates | [software › 9](yazilim/README.md#9-remote-access-and-updates) |
+| 3 | Flash the SD card (ready-made image, or stock OS + script) | [software › 1. Prepare the SD card](yazilim/README.md#1-prepare-the-sd-card) |
+| 4 | Assemble the electronics and the case (glue the screen in, tape the cables) | [hardware › 3. Assembly](donanim/README.md#3-step-by-step-assembly) · [3.9 Cable management](donanim/README.md#39-cable-management) |
+| 5 | Power on, scan the QR code, set up Wi-Fi, the Telegram bot and yourself from your phone | [software › 2–3](yazilim/README.md#2-insert-the-card-and-power-on) |
+| 6 | Photos, audio, add the family | [software › 5–7](yazilim/README.md#5-audio) |
+| 7 | Remote maintenance and updates | [software › 9](yazilim/README.md#9-remote-access-and-updates) |
 
 ## How it works
 
@@ -48,10 +49,11 @@ flowchart LR
 
 - A single Python server (`aiohttp`) runs on the Pi. It listens to Telegram, converts audio to Opus with `ffmpeg`, and keeps contacts and messages in SQLite.
 - The screen is a web page served by the same server (Chromium kiosk mode). Recording happens in the browser; the clip is uploaded to the server and sent to Telegram.
-- The admin page opens from any device on the home network with a PIN: approve contacts, photos, colors, order, sound, screen, quiet hours, updates and more.
+- The admin page opens from any device on the home network with a PIN: approve contacts, photos, colors, order, sound, screen, quiet hours, Wi-Fi, updates and more.
+- A small root helper (`wifi-yardimci.py`) watches the connection through NetworkManager. If the box can't get online it opens its own `MesajKutusu-XXXX` network so a phone can pick the home Wi-Fi.
 
 ## Privacy
 
 - The bot only accepts messages from people you **approve** on the admin page; groups and strangers are ignored.
-- The bot token and PIN live only on the device (`ayarlar.env` and the local database) and never enter this repository (`.gitignore`).
+- The bot token and PIN live only on the device (the local database, or `ayarlar.env` if you used it) and never enter this repository (`.gitignore`). The setup page only works with the one-time code shown on the box's screen and shuts itself off once setup is done.
 - Messages and photos are stored on the device (`~/mesajkutusu/veri`); by default the last 40 messages per person are kept.

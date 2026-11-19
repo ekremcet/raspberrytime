@@ -24,14 +24,14 @@ kiosk_yenile() {
   fi
 }
 
-# Bir kerelik sistem izinleri: yönetim sayfasından cihazı yeniden başlatma/kapatma ve ekran parlaklığı.
+# Bir kerelik sistem izinleri: yönetim sayfasından cihazı yeniden başlatma/kapatma, ekran parlaklığı ve Wi-Fi yardımcısı.
 # Yalnızca uzak kabuktan (etkileşimli) çalıştırılınca şifre sorar; yönetim sayfasından güncellemede atlanır.
 sistem_izinleri() {
   local kul sudo_dosya udev gecici
   kul="$(id -un)"
   sudo_dosya=/etc/sudoers.d/mesajkutusu
   udev=/etc/udev/rules.d/90-mesajkutusu-arka-isik.rules
-  [ -f "$sudo_dosya" ] && [ -f "$udev" ] && return 0
+  [ -f "$sudo_dosya" ] && [ -f "$udev" ] && [ -f /etc/systemd/system/mesajkutusu-wifi.service ] && return 0
   if [ ! -t 0 ]; then
     echo "    (yeniden başlatma ve parlaklık izinleri için bu betiği bir kez uzak kabuktan çalıştır)"
     return 0
@@ -45,6 +45,10 @@ sistem_izinleri() {
   rm -f "$gecici"
   echo 'SUBSYSTEM=="backlight", ACTION=="add", RUN+="/bin/chmod 0666 /sys%p/brightness"' | sudo tee "$udev" >/dev/null
   sudo sh -c 'chmod 0666 /sys/class/backlight/*/brightness' 2>/dev/null || true
+  echo "==> Wi-Fi yardımcısı (bağlantı yoksa kutunun kendi kurulum ağı)"
+  sed "s|__DIR__|$1|g" "$1/sistem/mesajkutusu-wifi.service" | sudo tee /etc/systemd/system/mesajkutusu-wifi.service >/dev/null
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now mesajkutusu-wifi.service || true
 }
 
 ana() {
@@ -53,16 +57,19 @@ ana() {
   SRC="$REPO/yazilim/mesajkutusu"
   APP="${MESAJKUTUSU_DIR:-$HOME/mesajkutusu}"
 
-  echo "==> GitHub'dan son sürüm alınıyor"
-  git -C "$REPO" pull --ff-only
+  if [ -z "${MESAJKUTUSU_YENI_BETIK:-}" ]; then
+    echo "==> GitHub'dan son sürüm alınıyor"
+    git -C "$REPO" pull --ff-only
+    # Bu betiğin kendisi de değişmiş olabilir: yeni sürümüyle devam et
+    MESAJKUTUSU_YENI_BETIK=1 exec bash "$REPO/yazilim/guncelle.sh" "$@"
+  fi
 
   echo "==> Dosyalar $APP klasörüne kopyalanıyor"
-  mkdir -p "$APP/static" "$APP/sistem"
-  for f in server.py kur.sh sd-hazirla.sh ayarlar.env.ornek static/index.html static/yonetim.html \
-           sistem/kiosk.sh sistem/mesajkutusu.service sistem/ilk-kurulum.sh sistem/mesajkutusu-kurulum.service; do
-    cp "$SRC/$f" "$APP/$f"
-  done
+  mkdir -p "$APP"
+  # Her şey kopyalanır; kişiler/mesajlar (veri/) ve ayarlar.env olduğu gibi kalır
+  tar -C "$SRC" --exclude=./veri --exclude=./ayarlar.env --exclude='__pycache__' -cf - . | tar -C "$APP" -xf -
   chmod +x "$APP/sistem/kiosk.sh"
+  git -C "$REPO" rev-parse HEAD > "$APP/SURUM"
 
   echo "==> Yeni ayarlar ekleniyor (mevcut değerlere dokunulmaz)"
   [ -f "$APP/ayarlar.env" ] || cp "$SRC/ayarlar.env.ornek" "$APP/ayarlar.env"
@@ -72,7 +79,7 @@ ana() {
     grep -q "^$k=" "$APP/ayarlar.env" || { echo "$satir" >> "$APP/ayarlar.env"; echo "    + $satir"; }
   done < "$SRC/ayarlar.env.ornek"
 
-  sistem_izinleri || echo "    (izinler kurulamadı, sorun değil)"
+  sistem_izinleri "$APP" || echo "    (izinler kurulamadı, sorun değil)"
 
   echo "==> Servis yeniden başlatılıyor"
   mkdir -p "$HOME/.config/systemd/user"

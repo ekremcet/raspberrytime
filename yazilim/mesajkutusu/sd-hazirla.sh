@@ -10,11 +10,9 @@ echo "SD kart: $BOOT"
 [ -f "$BOOT/issue.txt" ] && head -1 "$BOOT/issue.txt"
 
 echo "1) Uygulama kopyalanıyor"
-mkdir -p "$BOOT/mesajkutusu/static" "$BOOT/mesajkutusu/sistem"
-for f in server.py kur.sh ayarlar.env.ornek static/index.html static/yonetim.html \
-         sistem/kiosk.sh sistem/mesajkutusu.service sistem/ilk-kurulum.sh sistem/mesajkutusu-kurulum.service; do
-  cp "$HERE/$f" "$BOOT/mesajkutusu/$f"
-done
+mkdir -p "$BOOT/mesajkutusu"
+COPYFILE_DISABLE=1 tar -C "$HERE" --exclude ./veri --exclude ./ayarlar.env --exclude '__pycache__' -cf - . | tar -C "$BOOT/mesajkutusu" -xf -
+git -C "$HERE" rev-parse HEAD > "$BOOT/mesajkutusu/SURUM" 2>/dev/null || true
 [ -f "$BOOT/mesajkutusu/ayarlar.env" ] || cp "$HERE/ayarlar.env.ornek" "$BOOT/mesajkutusu/ayarlar.env"
 
 SATIR1='cp /boot/firmware/mesajkutusu/sistem/mesajkutusu-kurulum.service /etc/systemd/system/'
@@ -73,5 +71,5 @@ fi
 rm -f "$BOOT"/._* "$BOOT/mesajkutusu"/._* "$BOOT/mesajkutusu"/*/._* 2>/dev/null || true
 sync
 echo
-echo "Tamam. Bot anahtarını şimdi eklemek istersen: $BOOT/mesajkutusu/ayarlar.env dosyasında BOT_TOKEN= satırını doldur."
-echo "Sonra kartı çıkar, Pi'ye tak ve aç. Kurulum internet gerektirir ve birkaç dakika sürer; bitince Pi kendini yeniden başlatır."
+echo "Tamam. Kartı çıkar, Pi'ye tak ve aç. Kurulum internet gerektirir ve birkaç dakika sürer; bitince Pi kendini yeniden başlatır."
+echo "Sonra ekranda bir QR kod çıkar: telefonunla okut, kurulumu (bot anahtarı dahil) telefondan bitir."

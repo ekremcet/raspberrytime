@@ -133,6 +133,7 @@ pre.kayit { background: var(--bg); border: 1px solid var(--line); border-radius:
         <label class="alan"><span>Mikrofon</span><select id="mikrofon"></select></label>
         <label class="alan"><span>Mikrofon seviyesi</span>
           <div class="kaydirma"><input type="range" id="mikSeviye" min="0" max="100" step="5"><output id="mikSeviyeYaz"></output></div></label>
+        <label class="secim"><input type="checkbox" data-ayar="ses_otomatik" data-mesaj="Otomatik ses seçimi"> USB hoparlör ve mikrofonu otomatik seç (elle seçince kapanır)</label>
       </section>
       <section class="kart bilgi">
         <h2>Bildirim zili</h2>
@@ -235,6 +236,15 @@ pre.kayit { background: var(--bg); border: 1px solid var(--line); border-radius:
       <section class="kart bilgi">
         <h2>Cihaz</h2>
         <dl class="bilgi-liste" id="sistemBilgi"></dl>
+      </section>
+      <section class="kart bilgi" id="wifiKart" hidden>
+        <h2>Wi-Fi</h2>
+        <p class="kucuk" style="margin:0" id="wifiDurum"></p>
+        <label class="alan"><span>Ağ</span><select id="wifiAg"></select></label>
+        <label class="alan" id="wifiElleAlan" hidden><span>Ağ adı</span><input type="text" id="wifiElle" autocomplete="off" autocapitalize="none"></label>
+        <label class="alan"><span>Şifre</span><input type="password" id="wifiSifre" autocomplete="off"></label>
+        <div class="satir"><button type="button" class="ana" id="wifiBagla">Bu ağa bağlan</button></div>
+        <p class="kucuk" style="margin:0">Kutu yeni ağa geçer; bu sayfa bağlantıyı kaybedebilir. Bağlanamazsa eski ağa döner ya da ekranda kurulum ağının QR kodunu gösterir.</p>
       </section>
       <section class="kart bilgi">
         <h2>Güncelleme</h2>
@@ -354,8 +364,8 @@ function sesCiz(d) {
 }
 async function sesYukle() { try { sesCiz(await api("/api/yonetim/ses")); } catch (e) {} }
 async function sesKaydet(veri, yazi) { try { sesCiz(await kaydet(() => api("/api/yonetim/ses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(veri) }), yazi)); } catch (e) { sesYukle(); } }
-$("hoparlor").addEventListener("change", e => sesKaydet({ hoparlor: +e.target.value }, "✓ Hoparlör seçildi"));
-$("mikrofon").addEventListener("change", e => sesKaydet({ mikrofon: +e.target.value }, "✓ Mikrofon seçildi"));
+$("hoparlor").addEventListener("change", e => { sesKaydet({ hoparlor: +e.target.value }, "✓ Hoparlör seçildi"); const o = document.querySelector('[data-ayar="ses_otomatik"]'); if (o) o.checked = false; });
+$("mikrofon").addEventListener("change", e => { sesKaydet({ mikrofon: +e.target.value }, "✓ Mikrofon seçildi"); const o = document.querySelector('[data-ayar="ses_otomatik"]'); if (o) o.checked = false; });
 $("sesSeviye").addEventListener("input", e => $("sesSeviyeYaz").textContent = "%" + e.target.value);
 $("mikSeviye").addEventListener("input", e => $("mikSeviyeYaz").textContent = "%" + e.target.value);
 $("sesSeviye").addEventListener("change", e => sesKaydet({ ses: +e.target.value }, "✓ Ses seviyesi kaydedildi"));
@@ -400,7 +410,24 @@ function sistemCiz(d) {
     satir("Disk", `${d.disk_bos} GB boş / ${d.disk_toplam} GB`) + satir("Bellek", d.bellek_toplam ? `${d.bellek_bos} GB boş / ${d.bellek_toplam} GB` : null);
   $("guncelKayit").hidden = !d.guncelleme_log; $("guncelKayit").textContent = d.guncelleme_log || "";
 }
-async function sistemYukle() { try { sistemCiz(await api("/api/yonetim/sistem")); } catch (e) {} }
+async function sistemYukle() { try { sistemCiz(await api("/api/yonetim/sistem")); } catch (e) {} wifiYukle(); }
+async function wifiYukle() {
+  let d; try { d = await api("/api/yonetim/wifi"); } catch (e) { return; }
+  $("wifiKart").hidden = !d.yardimci; if (!d.yardimci) return;
+  const w = d.wifi || {};
+  $("wifiDurum").textContent = w.mod === "bagli" ? (w.ssid === "kablo" ? "Kabloyla bağlı" : `Bağlı: ${w.ssid}`) + (w.ip ? ` (${w.ip})` : "")
+    : w.mod === "hotspot" ? `Kurulum ağı açık: ${w.hotspot_ssid}` : w.mod === "baglaniyor" ? "Bağlanıyor…" : "Bağlı değil";
+  const sec = $("wifiAg"), eski = sec.value;
+  sec.innerHTML = (d.aglar || []).map(a => `<option value="${esc(a.ssid)}">${esc(a.ssid)}${a.guvenli ? " 🔒" : ""}</option>`).join("") + '<option value="">Başka bir ağ…</option>';
+  sec.value = eski || (d.aglar && d.aglar[0] ? d.aglar[0].ssid : "");
+  $("wifiElleAlan").hidden = sec.value !== "";
+}
+$("wifiAg").addEventListener("change", e => $("wifiElleAlan").hidden = e.target.value !== "");
+$("wifiBagla").addEventListener("click", async () => {
+  const ssid = $("wifiAg").value || $("wifiElle").value.trim(); if (!ssid) return;
+  try { await kaydet(() => api("/api/kurulum/wifi", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ssid, sifre: $("wifiSifre").value }) }), "✓ Kutu ağa bağlanıyor");
+        $("wifiSifre").value = ""; setTimeout(wifiYukle, 15000); } catch (e) {}
+});
 async function sistemIslem(islem, yazi) { return kaydet(() => api("/api/yonetim/sistem", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ islem }) }), yazi); }
 $("denetle").addEventListener("click", async () => {
   $("guncelDurum").textContent = "Denetleniyor…";

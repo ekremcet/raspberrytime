@@ -8,135 +8,123 @@ The box is a single Python server (`mesajkutusu/server.py`) running on Raspberry
 
 > The device interface and the admin page are in Turkish by default. The child's screen and the bot messages can be switched to English on the admin page (**Genel › Dil**). Admin page labels are given below as they appear, with an English translation.
 
-**You need:** a Mac/PC with an SD card reader, Telegram on your phone, and the Wi-Fi network the box will join.
+**You need:** a Mac/PC with an SD card reader, a phone with Telegram, and your home Wi-Fi password. No typing on the Pi and no config files: the box shows a QR code and the rest happens on your phone.
 
 ---
 
-## 1. Create the Telegram bot
+## 1. Prepare the SD card
 
-On your phone, about 5 minutes:
+Pick one of the two ways.
 
-1. In Telegram, search for **@BotFather** (the official account with the blue check mark) and tap **Start**.
-2. Send `/newbot`.
-3. It asks for a display name, e.g. `Ayşe's Box`. Family members will see this name.
-4. It asks for a username: it must end in `bot` and be available, e.g. `aysebox_bot`.
-5. BotFather replies with a **token** like `123456789:AAH...`. Copy it. The token is the bot's password; don't share it.
-6. Send `/setjoingroups` → choose your bot → **Disable**, so the bot can't be added to groups.
-7. Optionally set a bot photo with `/setuserpic`.
+### A. Ready-made image (easiest)
 
----
+1. Download the latest `mesajkutusu-*.img.xz` from the repository's [**Releases**](https://github.com/ekremcet/raspberrytime/releases) page.
+2. Open [Raspberry Pi Imager](https://www.raspberrypi.com/software/) → **Device:** Raspberry Pi 4 or 5 → **Operating system:** scroll down to **Use custom** and pick the downloaded file → **Storage:** the SD card.
+3. When Imager offers OS customisation, choose **No**. The image already has everything (user `kutu`, hostname `mesajkutusu`, packages, the app). Write the card.
 
-## 2. Write the SD card (Raspberry Pi Imager)
+The image is Raspberry Pi OS (64-bit, desktop) with the app preinstalled, built by the [`SD card image`](../.github/workflows/imaj.yml) workflow. It is set up for Turkey (Wi-Fi country `TR`, Turkish locale, Istanbul time zone); build your own with other values from the **Actions** tab (see [13. Development](#13-development)).
 
-1. Install and open [Raspberry Pi Imager](https://www.raspberrypi.com/software/).
-2. **Device:** Raspberry Pi 5. **Operating system:** Raspberry Pi OS (64-bit), the desktop version. **Storage:** the SD card.
-3. In the customization screen, be sure to fill in:
-   - Hostname: `mesajkutusu`
-   - Username and password (don't forget them; you need them for remote maintenance)
-   - **Wi-Fi name and password** (the first-boot installation downloads packages from the internet)
-   - Time zone and keyboard layout
-   - Optionally enable SSH
-4. Write the card. When it's done, don't eject it; it shows up on the Mac as a disk called `bootfs`.
+### B. Official Raspberry Pi OS + the setup script
 
----
+Use this if there's no release yet or you want the stock OS.
 
-## 3. Prepare the SD card for the box
-
-This step copies the app to the card's boot partition and sets up the Pi to install itself on first boot. Since a Mac can't write to the card's Linux partition, the actual installation happens on the Pi's first boot.
-
-1. Download this repository: **Code › Download ZIP**, or `git clone https://github.com/ekremcet/raspberrytime`.
-2. With the card in the Mac, double-click `yazilim/mesajkutusu/SD-KARTA-KUR.command`.
-   - If macOS blocks it: right-click › **Open**.
-   - Or in Terminal: `bash yazilim/mesajkutusu/sd-hazirla.sh /Volumes/bootfs`
+1. In Raspberry Pi Imager: **Device:** Raspberry Pi 4/5. **Operating system:** Raspberry Pi OS (64-bit), the desktop version. In the customisation screen fill in hostname `mesajkutusu`, a username and password, **your Wi-Fi** (the first boot downloads packages), time zone and keyboard. Write the card and leave it in the Mac; it appears as a disk called `bootfs`.
+2. Download this repository (**Code › Download ZIP**, or `git clone https://github.com/ekremcet/raspberrytime`).
+3. With the card in the Mac, double-click `yazilim/mesajkutusu/SD-KARTA-KUR.command`.
+   - If macOS blocks it: right-click › **Open**. Or in Terminal: `bash yazilim/mesajkutusu/sd-hazirla.sh /Volumes/bootfs`
    - On Linux: `bash yazilim/mesajkutusu/sd-hazirla.sh /media/$USER/bootfs`
-3. In Finder, open `bootfs › mesajkutusu › ayarlar.env` with TextEdit and fill it in:
-   ```
-   BOT_TOKEN=123456789:AAH...      # the token from step 1; no spaces or quotes
-   YONETICI_PIN=4826               # digits of your choice for the admin page
-   KUTU_ADI=Ayşe's Box             # name of the box
-   ```
-   For other settings see [10. Settings](#10-settings).
-4. Save. In Finder, click ⏏ next to `bootfs` to **eject the card safely**.
+4. Eject the card (⏏ next to `bootfs` in Finder).
 
-The script detects which first-boot mechanism the card's Raspberry Pi OS uses (cloud-init `user-data`, Imager `firstrun.sh`, or neither). Running it twice does no harm.
+The script copies the app to the card's boot partition and hooks a one-time installer into the first boot (it detects cloud-init `user-data`, Imager's `firstrun.sh`, or neither). Running it twice does no harm. You no longer need to edit `ayarlar.env`; the bot token and PIN are entered on your phone in step 3.
 
 ---
 
-## 4. Insert the card and power on
+## 2. Insert the card and power on
 
 1. Insert the card into the Pi and connect power.
-2. The Pi restarts a few times by itself (expanding the disk, applying user and Wi-Fi settings). This is normal.
-3. The desktop appears. The installation runs in the background (5–10 min); nothing changes on screen meanwhile. The installer:
-   - installs the `python3-aiohttp`, `ffmpeg` and `chromium` packages,
-   - copies the app to `~/mesajkutusu`,
-   - sets up the server as a user service that starts at boot (`mesajkutusu.service`),
-   - enables automatic desktop login and the full-screen interface, and turns off the system's own screen blanking.
-4. The Pi restarts once more and the home screen with the contact photos opens.
+2. **Image (A):** after one or two automatic restarts (the card expands itself) the setup screen appears, usually within 2 minutes.
+3. **Script (B):** the Pi restarts a few times, the desktop appears, and the installer runs in the background for 5–10 minutes (it installs `python3-aiohttp`, `ffmpeg`, `chromium`, copies the app to `~/mesajkutusu`, sets up the services, turns on automatic login and the full-screen interface). Then it restarts once more. Progress is written to `mesajkutusu-kurulum.log` on the card's boot partition; without internet it retries every 30 seconds.
 
-Installation progress is written to `mesajkutusu-kurulum.log` on the card's boot partition. If something goes wrong, put the card in the Mac and read that file. Without internet, the installer retries every 30 seconds.
+When it's ready the box shows **"Merhaba! Kurulumu telefonundan yap"** (Hi! Set me up from your phone) with a QR code and a 6-character code.
+
+If the picture is upside down, tap **Ekran ters mi?** (Screen upside down?) in the bottom-left corner; the picture and touch rotate together.
 
 ---
 
-## 5. Screen orientation
+## 3. Set up from your phone
 
-If the screen sits upside down in the case, the picture is upside down. Two ways to fix it:
+![Setup screen on the box](gorseller/kurulum_kutu.png)
 
-**A. From the admin page (easiest):** on the **Ekran** (Screen) tab, set **Ekran yönü** (Screen orientation) to **Ters (180°)** (Inverted). The picture and the touch input rotate immediately and the setting is applied at every boot. With "Sistem ayarı" (System setting) selected, the box leaves the desktop setting from option B alone.
+**If the box couldn't get online** (new image, no Wi-Fi yet), after about a minute it opens its own Wi-Fi network called `MesajKutusu-XXXX` and shows two QR codes: **1** joins that network (the password is printed under it), **2** opens the setup page. Pick your home Wi-Fi on the page and type its password. The box switches to your network, the phone drops off the box's network (expected), and a new QR code appears on the box: reconnect the phone to your home Wi-Fi and scan it to carry on. If the password was wrong, the box reopens its own network and says so.
 
-**B. From the desktop:**
-1. In the remote shell or with a keyboard, run `pkill -f chromium`; the full-screen interface closes.
-2. Raspberry menu › **Preferences › Control Centre › Screens**.
-3. Right-click **DSI-1** › **Orientation › Inverted** › **Apply**. If there is a **Touchscreen** menu, assign the touchscreen to the DSI display as well.
-4. `sudo reboot`. The setting is permanent.
+**If the box is online**, scan the single QR code with the phone's camera. The phone must be on the same Wi-Fi. If it asks for a code, type the one on the screen.
+
+The setup page walks through five steps (Turkish or English, switch with the TR/EN button):
+
+| Step | What you do |
+|---|---|
+| **The box and you** | Your name as shown on the box (Dad, Mom…), the child's name, the box name, the box language |
+| **Admin PIN** | 4–12 digits; needed later to approve people and change settings |
+| **Telegram bot** | Open **@BotFather** (button on the page), send `/newbot`, give it a name and a username ending in `bot`, copy the token BotFather sends and paste it. The page checks it with Telegram before saving. |
+| **Add yourself** | Tap **Open in Telegram** and press **Start**. You are approved automatically and your tile appears on the box. |
+| **Done** | The page shows the bot link to send to family and opens the admin page, already logged in. |
+
+![Setup wizard on the phone](gorseller/kurulum_telefon.png)
+
+Optional, in BotFather: `/setjoingroups` → your bot → **Disable** (the bot ignores groups anyway), and `/setuserpic` for a bot photo. The token is the bot's password; don't share it.
+
+> Want to try it without Telegram first? On the bot step, tap **Try it without Telegram (demo)**. The box starts with sample contacts; add a token later on the admin page (**Genel › Bot anahtarı**).
 
 ---
 
-## 6. Audio
+## 4. Screen orientation
 
-Easiest: on the admin page's **Ses** (Sound) tab, pick the speaker and microphone, adjust the levels, and test with **Zili kutuda çal** (Ring the chime on the box).
+Besides the **Ekran ters mi?** button on the setup screen, the admin page's **Ekran** (Screen) tab has **Ekran yönü** (Screen orientation): **Ters (180°)** (Inverted) rotates the picture and touch immediately and at every boot. "Sistem ayarı" (System setting) leaves the desktop's own setting alone.
 
-It can also be done from the command line. The box uses the default speaker and microphone. Check:
+---
+
+## 5. Audio
+
+The box picks the **USB speaker and USB microphone automatically** (checked every 30 seconds, so a device plugged in later is picked up too). On the admin page's **Ses** (Sound) tab you can adjust the levels and test with **Zili kutuda çal** (Ring the chime on the box). Choosing a device by hand there turns the automatic choice off; tick **USB hoparlör ve mikrofonu otomatik seç** to turn it back on.
+
+USB speakers may start at a low level (40%); if you can't hear the chime, raise **Ses seviyesi** first. From the command line: `wpctl status` lists the devices (the default has an asterisk), `wpctl set-default <id>` and `wpctl set-volume @DEFAULT_AUDIO_SINK@ 1.0` change them.
+
+---
+
+## 6. Admin page
+
+Open **http://mesajkutusu.local:8080/yonetim** on a phone or computer on the same Wi-Fi (if `.local` doesn't resolve, use the IP shown under the QR during setup or on the **Sistem** tab). Log in with your PIN. Things to try first:
+
+1. Tap the photo box of your tile and pick a photo. It isn't cropped; it's fitted whole into the tile. Set the color and order here too.
+2. **Deneme mesajı** (Test message) checks the chime and the screen.
+3. Send a voice message to the bot from Telegram. The box chimes and your tile glows.
+4. On the box: tap your tile, tap the **microphone**, talk, tap the **square**. The message arrives in your Telegram as a voice note.
+
+Forgot the PIN? In the remote shell, this drops the PIN you chose and falls back to the one generated at first start, which it then prints:
 
 ```bash
-wpctl status
+python3 -c "import sqlite3,os; c=sqlite3.connect(os.path.expanduser('~/mesajkutusu/veri/kutu.db')); c.execute(\"DELETE FROM meta WHERE k='gizli_pin'\"); c.commit()"
+systemctl --user restart mesajkutusu && cat ~/mesajkutusu/veri/yonetici_pin.txt
 ```
-
-Under `Sinks` the USB speaker (e.g. `UACDemoV1.0`) and under `Sources` the BOYA (`UAC 1.0 Microphone`) should be marked with an **asterisk**. If not:
-
-```bash
-wpctl set-default <id>                        # once for the speaker, once for the microphone
-wpctl set-volume @DEFAULT_AUDIO_SINK@ 1.0     # speaker volume 100% (0.7 if too loud)
-```
-
-USB speakers may default to a low level (40%); if you can't hear the chime, check this first.
 
 ---
 
-## 7. Admin page and first contact
+## 7. Add the family
 
-1. Connect your phone to the **same Wi-Fi** as the box and open **http://mesajkutusu.local:8080/yonetim**.
-   - If it doesn't open, find the IP with `hostname -I` on the Pi and use `http://IP:8080/yonetim`.
-2. Log in with the PIN from `ayarlar.env`. (If you left the PIN empty, a random one was generated: `cat ~/mesajkutusu/veri/yonetici_pin.txt`)
-3. The **Bot** section should show a green dot and a **t.me/...** link. Tap the link and press **Start** when Telegram opens.
-4. Refresh the page: you appear under **Onay bekleyenler** (Waiting for approval). Type the name to show on the box (Dad, Mom…) and press **Onayla** (Approve).
-5. Tap the photo box and pick a photo. The photo isn't cropped; it is fitted whole into the tile. Set the color and order here too.
-6. Test the chime and the screen with **Deneme mesajı** (Test message).
-7. Send a voice message to the bot from Telegram (hold the microphone button). The box chimes and your tile glows.
-8. On the box, tap your tile, tap the **microphone**, talk, and tap the **square** button. The message is sent right away and arrives in your Telegram as a voice note.
-
----
-
-## 8. Add the family
-
-1. Send the **t.me/...** link from the admin page to your family members.
-2. Each of them opens the link and taps **Start**. The bot tells them they are waiting for approval.
+1. Send the **t.me/...** link (on the last wizard step, and in the **Bot** section of the admin page) to your family.
+2. Each of them opens it and taps **Start**. The bot tells them they're waiting for approval.
 3. On the admin page, press **Onayla** (Approve) and give them a name and photo.
 
-Telegram doesn't let a bot message someone who has never written to it, so everyone has to tap **Start** once. Messages from people you haven't approved are ignored.
+Telegram doesn't let a bot message someone who has never written to it, so everyone taps **Start** once. Messages from people you haven't approved are ignored.
 
-How family members use it: they send the bot ordinary Telegram voice messages. The child's messages arrive in the same chat as voice notes. When the child listens to a message, a 👀 reaction appears on it in the sender's Telegram.
+How family members use it: they send the bot ordinary Telegram voice messages. The child's messages arrive in the same chat as voice notes. When the child listens to a message, a 👀 reaction appears on it in the sender's Telegram. If anything other than a voice message is sent (text, photo, sticker, video), the bot replies "⚠️ *Child's name* can't see this, only voice messages".
 
-If anything other than a voice message is sent (text, photo, sticker, video), the bot immediately replies "⚠️ *Child's name* can't see this, only voice messages". Enter the child's name on the admin page's **Genel** (General) tab.
+---
+
+## 8. Wi-Fi
+
+- **Change network** (moving house, new router): admin page › **Sistem** › **Wi-Fi**: pick the network, type the password, **Bu ağa bağlan** (Connect). If it can't connect, the box goes back to the old network.
+- **Box can't reach any known network** (router off, password changed): after about a minute it opens its `MesajKutusu-XXXX` network and the screen shows "Wi-Fi'ye bağlanamadım" (I can't reach the Wi-Fi) with the two QR codes; the second one opens the admin page, where you pick the new network. While nobody is connected to it, the box retries the known networks every 4 minutes, so it comes back by itself when the router returns.
 
 ---
 
@@ -148,30 +136,25 @@ Comes with Raspberry Pi OS. Pair the Pi with your Raspberry Pi account via the *
 - **Remote shell:** a command line (updates, logs, settings)
 - **Screen sharing:** see the screen and change desktop settings
 
-### First time: get the repository onto the Pi
+### Update from the admin page (easiest)
 
-Once, in the remote shell:
+**Sistem** (System) tab › **Güncellemeleri denetle** (Check for updates) → **Güncelle** (Update). The first check downloads the source code to `~/raspberrytime` by itself. The box comes back with the new version within about a minute.
 
-```bash
-git clone https://github.com/ekremcet/raspberrytime ~/raspberrytime
-bash ~/raspberrytime/yazilim/guncelle.sh
-```
-
-### Every update
+### Update from the remote shell
 
 ```bash
 bash ~/raspberrytime/yazilim/guncelle.sh
 ```
 
 The script:
-1. pulls the latest version from GitHub (`git pull`),
+1. pulls the latest version from GitHub (`git pull`) and continues with the new copy of itself,
 2. copies the files to `~/mesajkutusu`; **it doesn't touch `veri/` (contacts, messages, photos) or `ayarlar.env`**,
 3. adds any newly introduced settings to `ayarlar.env` with their default values,
 4. restarts the service and reopens the interface on the screen.
 
-### Updating from the admin page
+If `~/raspberrytime` doesn't exist yet: `git clone https://github.com/ekremcet/raspberrytime ~/raspberrytime` first.
 
-Once the repository is on the Pi (the `git clone` above), you can also update without the remote shell: on the admin page's **Sistem** (System) tab, use **Güncellemeleri denetle** (Check for updates) → **Güncelle** (Update). The box comes back with the new version within about a minute.
+> **Boxes installed before the setup wizard existed:** run `bash ~/raspberrytime/yazilim/guncelle.sh` once from the remote shell (not the admin page) and enter your password when asked. That installs the Wi-Fi helper (`mesajkutusu-wifi.service`) along with the restart and brightness permissions. Your contacts, token and PIN stay as they are; the box doesn't go into setup mode.
 
 ---
 
@@ -182,15 +165,15 @@ After installation, **all settings are changed from the admin page** and take ef
 | Tab | Settings |
 |---|---|
 | **Kişiler** (People) | Bot status and invite link, people waiting for approval, contact name, photo, color, order, test message, remove/block |
-| **Ses** (Sound) | Speaker and microphone selection, volume, microphone level, **Zili kutuda çal** (ring the chime on the box), chime on/off, chime volume, reminder interval for unheard messages |
+| **Ses** (Sound) | Automatic USB speaker/microphone choice, speaker and microphone selection, volume, microphone level, **Zili kutuda çal** (ring the chime on the box), chime on/off, chime volume, reminder interval for unheard messages |
 | **Ekran** (Screen) | Day and night brightness, sleep timeout (default 2 min), show clock while sleeping, dark night theme, screen orientation (touch rotates along) |
 | **Sessiz / Gece** (Quiet / Night) | Turn quiet mode on/off now, automatic quiet mode every night (default 19:30–07:30), "will be seen in the morning" note to senders at night |
 | **Genel** (General) | Box name, child's name (used in bot warnings), language (Turkish/English: box screen + bot messages), maximum recording length, number of stored messages, 👀 listened reaction, network access to the child screen, **admin PIN**, **bot token** |
-| **Sistem** (System) | Device info (version, IP, temperature, disk, memory), **check for and install updates**, restart the app / device, shut down |
+| **Sistem** (System) | Device info (version, IP, temperature, disk, memory), **Wi-Fi network**, **check for and install updates**, restart the app / device, shut down |
 
-**One-time permission:** For the brightness and "Restart / Shut down device" buttons, run `bash ~/raspberrytime/yazilim/guncelle.sh` once from the remote shell on the Pi and enter your password. The script only adds permissions for these two things (`/etc/sudoers.d/mesajkutusu` and a udev rule for the backlight).
+The installer (image or script) grants the box what these buttons need: `/etc/sudoers.d/mesajkutusu` (restart / shut down only), a udev rule for the backlight, and the root `mesajkutusu-wifi.service` that manages Wi-Fi through NetworkManager.
 
-`~/mesajkutusu/ayarlar.env` now only holds initial values (`BOT_TOKEN`, `YONETICI_PIN`, `KUTU_ADI`, `PORT`). A value changed on the admin page takes precedence over the file.
+`~/mesajkutusu/ayarlar.env` is optional and only holds starting values (`BOT_TOKEN`, `YONETICI_PIN`, `KUTU_ADI`, `PORT`). Values from the setup wizard or the admin page take precedence. A box with `BOT_TOKEN` filled in skips the setup wizard.
 
 ---
 
@@ -218,15 +201,18 @@ sudo journalctl _SYSTEMD_USER_UNIT=mesajkutusu.service -n 30 --no-pager
 
 | Symptom | Cause and fix |
 |---|---|
+| Setup QR doesn't open on the phone | The phone must be on the same network as the box (your home Wi-Fi, or the box's `MesajKutusu-XXXX` network). Some phones leave a network without internet; if so, turn off mobile data while setting up. |
+| Box shows "Wi-Fi'ye bağlanamadım" after I picked my network | The password was wrong, or the network is 5 GHz-only on an old router: try again on the setup page. |
 | **"İnternet yok"** (No internet) on screen, but the Pi is online | Check the log. `Conflict` means the same bot is running somewhere else too (e.g. a test server left running on a Mac): stop it. `Unauthorized` / `Not Found` means the token is wrong (the screen shows "Bot anahtarı hatalı" / bot key is wrong). |
 | Red dot on the admin page | Right after the server starts, the first connection takes a few seconds. If it persists, check the log as above. |
-| Picture upside down | [5. Screen orientation](#5-screen-orientation) |
-| Touches land in the wrong place | The screen was rotated but touch wasn't mapped to it: use option A in section 5, or assign the touchscreen to DSI under Screens › Touchscreen |
+| Picture upside down | Tap **Ekran ters mi?** on the setup screen, or [4. Screen orientation](#4-screen-orientation) |
+| Touches land in the wrong place | The screen was rotated but touch wasn't mapped to it: set the orientation from the admin page (section 4) so touch rotates with the picture |
 | Can't hear the chime / sound | Admin › **Sessiz / Gece**: is quiet mode or night mode on? Admin › **Ses**: is the right speaker selected, what's the level? Test with **Zili kutuda çal**. |
-| Brightness or "Restart device" doesn't work | One-time permission needed: run `bash ~/raspberrytime/yazilim/guncelle.sh` in the remote shell and enter your password. |
+| Brightness, "Restart device" or the Wi-Fi card doesn't work | Older install: run `bash ~/raspberrytime/yazilim/guncelle.sh` once in the remote shell and enter your password. |
 | "Mikrofon bulunamadı" (Microphone not found) | Does the BOYA appear under `Sources` in `wpctl status`? Unplug and replug the USB extension. |
 | Admin page won't open | Is the phone on the same Wi-Fi? Try the IP instead of `mesajkutusu.local` (`hostname -I`). |
-| First installation didn't finish | Put the card in the Mac and read `bootfs/mesajkutusu-kurulum.log`. "İnternet yok" means the Wi-Fi details are missing. |
+| First installation didn't finish (script method) | Put the card in the Mac and read `bootfs/mesajkutusu-kurulum.log`. "İnternet yok" means the Wi-Fi details are missing. |
+| Wi-Fi helper log | `sudo journalctl -u mesajkutusu-wifi -n 30 --no-pager` |
 | Screen goes dark now and then, or doesn't turn on | Most likely the display power wires (pin 4/6) or a ribbon cable is loose: [hardware › 3.9 Cable management](../donanim/README.md#39-cable-management) |
 | Microphone drops out now and then | The joint between the microphone and the USB extension is loose: tape it ([hardware › 3.9](../donanim/README.md#39-cable-management)) |
 | Server doesn't run at all | `systemctl --user status mesajkutusu` |
@@ -247,7 +233,15 @@ python3 server.py
 - Child screen: http://localhost:8080 (Chrome recommended)
 - Admin: http://localhost:8080/yonetim (the PIN is printed in the terminal)
 
-With an empty `BOT_TOKEN` it starts in **demo mode** with sample contacts. When testing with the real bot, stop the server on the Pi: a bot can only be polled from one place at a time.
+With an empty `BOT_TOKEN` it starts in **setup mode**: the child screen shows the QR code and http://localhost:8080/kurulum runs the wizard (the code is printed in the terminal). For **demo mode** with sample contacts and no Telegram: `DEMO=1 python3 server.py`. When testing with the real bot, stop the server on the Pi: a bot can only be polled from one place at a time.
+
+### Build the SD card image
+
+The [`SD card image`](../.github/workflows/imaj.yml) workflow builds Raspberry Pi OS (64-bit, desktop) with [pi-gen](https://github.com/RPi-Distro/pi-gen) through [`usimd/pi-gen-action`](https://github.com/usimd/pi-gen-action), adding the custom stage in [`imaj/stage-mesajkutusu`](../imaj/stage-mesajkutusu). The stage runs `sistem/ilk-kurulum.sh` inside the image with `MESAJKUTUSU_IMAJ=1`, the same installer the SD-card method runs on first boot.
+
+- **Release:** push a tag such as `v1.0`; the image (`.img.xz`, about 1.5 GB) is attached to the GitHub release.
+- **Test build:** Actions › **SD card image** › **Run workflow**; set the Wi-Fi country, locale and time zone. The image is downloadable from the run page for 14 days.
+- A build takes about 1–2 hours on GitHub's free runners. The image user is `kutu` (password `mesajkutusu`, SSH off); change the password from the remote shell with `passwd` if you turn SSH on.
 
 ### Files
 
@@ -255,17 +249,21 @@ With an empty `BOT_TOKEN` it starts in **demo mode** with sample contacts. When 
 yazilim/
 ├── guncelle.sh                      on the Pi: git pull + install (data and settings kept)
 └── mesajkutusu/
-    ├── server.py                    server: Telegram bridge, audio conversion, API, WebSocket
-    ├── static/index.html            child screen
+    ├── server.py                    server: Telegram bridge, audio conversion, setup wizard API, WebSocket
+    ├── static/index.html            child screen (+ setup QR screen)
+    ├── static/kurulum.html          setup wizard (phone)
     ├── static/yonetim.html          admin page
+    ├── static/vendor/qrcode.js      QR code generator (MIT, Kazuhiko Arase)
     ├── ayarlar.env.ornek            settings template
     ├── sd-hazirla.sh                prepares the SD card on Mac/Linux
     ├── SD-KARTA-KUR.command         double-click wrapper for macOS
     ├── kur.sh                       manual installation (over SSH, on the Pi)
     └── sistem/
-        ├── ilk-kurulum.sh           runs once as root on first boot
+        ├── ilk-kurulum.sh           installer: first boot (SD method) or inside the image build
         ├── mesajkutusu-kurulum.service
         ├── mesajkutusu.service      the server (user service)
+        ├── wifi-yardimci.py         Wi-Fi helper (root): fallback network, connect requests
+        ├── mesajkutusu-wifi.service
         └── kiosk.sh                 full-screen Chromium + screen orientation
 ```
 
@@ -288,6 +286,9 @@ yazilim/
 | `GET/POST /api/yonetim/guvenlik` | PIN and bot token |
 | `GET/POST /api/yonetim/sistem` | Device info, update, restart, shut down |
 | `POST /api/ekran` | Child screen went to sleep / woke up (backlight) |
+| `GET /api/yonetim/wifi` | Wi-Fi state and nearby networks |
+| `GET /kurulum` | Setup wizard (only until setup is finished) |
+| `/api/kurulum/...` | With the `X-Kurulum-Kodu` header (the code on the box screen): `durum`, `genel`, `pin`, `token`, `davet` via Telegram `/start <invite>`, `wifi`, `demo`, `bitir`. All return 403 once setup is finished; `wifi` then needs the admin PIN instead. |
 
 ### Manual installation (instead of the SD card method)
 
@@ -297,7 +298,5 @@ On a Pi with SSH enabled:
 git clone https://github.com/ekremcet/raspberrytime ~/raspberrytime
 cp -r ~/raspberrytime/yazilim/mesajkutusu ~/mesajkutusu
 cd ~/mesajkutusu && bash kur.sh
-nano ayarlar.env                     # BOT_TOKEN and YONETICI_PIN
-systemctl --user restart mesajkutusu
-sudo reboot
+sudo reboot                          # then scan the QR code on the screen
 ```

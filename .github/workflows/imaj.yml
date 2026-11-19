@@ -1,0 +1,77 @@
+# Hazır SD kart imajı: Raspberry Pi OS (64-bit, masaüstü) + Sesli Mesaj Kutusu.
+# "v*" etiketi gönderilince imaj üretilir ve GitHub Releases'e eklenir.
+# Actions sekmesinden elle de çalıştırılabilir (imaj o zaman iş akışı çıktısı olarak indirilir).
+name: SD card image
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      wifi_country:
+        description: "Wi-Fi country code (2 letters). Wi-Fi stays off without it."
+        default: "TR"
+      locale:
+        description: "System locale"
+        default: "tr_TR.UTF-8"
+      timezone:
+        description: "Time zone"
+        default: "Europe/Istanbul"
+
+permissions:
+  contents: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Put the app into the image stage
+        run: |
+          hedef=imaj/stage-mesajkutusu/00-mesajkutusu/files/mesajkutusu
+          mkdir -p "$hedef"
+          tar -C yazilim/mesajkutusu --exclude=./veri --exclude=./ayarlar.env --exclude=__pycache__ -cf - . | tar -C "$hedef" -xf -
+          echo "${GITHUB_SHA}" > "$hedef/SURUM"
+          ls -la "$hedef"
+
+      - name: Build image (pi-gen)
+        id: build
+        uses: usimd/pi-gen-action@v1
+        with:
+          image-name: mesajkutusu
+          stage-list: stage0 stage1 stage2 stage3 ./imaj/stage-mesajkutusu
+          username: kutu
+          password: mesajkutusu
+          disable-first-boot-user-rename: 1
+          hostname: mesajkutusu
+          wpa-country: ${{ inputs.wifi_country || 'TR' }}
+          locale: ${{ inputs.locale || 'tr_TR.UTF-8' }}
+          timezone: ${{ inputs.timezone || 'Europe/Istanbul' }}
+          keyboard-keymap: tr
+          keyboard-layout: Turkish
+          enable-ssh: 0
+          compression: xz
+          compression-level: 6
+          increase-runner-disk-size: true
+          verbose-output: true
+
+      - name: Upload as workflow artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mesajkutusu-image
+          path: ${{ steps.build.outputs.image-path }}
+          compression-level: 0
+          retention-days: 14
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.build.outputs.image-path }}
+          body: |
+            Ready-to-flash SD card image for the voice message box (Raspberry Pi 4 / 5, 64-bit desktop).
+            Write it with Raspberry Pi Imager → "Use custom". Do NOT apply OS customisation in Imager.
+            On first boot the screen shows a QR code; scan it with your phone and follow the setup.

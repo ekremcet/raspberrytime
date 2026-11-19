@@ -127,6 +127,22 @@ body.gece .kutucuk, body.gece .dinle, body.gece .panel, body.gece .geri, body.ge
 body.gece .geri { background: #1C2433; color: #E6EAF2; }
 body.gece .ok { background: rgba(28, 36, 51, .92); color: #E6EAF2; }
 body.gece .hap { background: #2A2416; color: #E9C98A; }
+/* kurulum ekranı: telefonla QR okut */
+.kurulum { position: fixed; inset: 0; z-index: 30; background: var(--bg); display: flex; align-items: center; gap: 4vw; padding: 5vh 5vw; }
+.kurulum .yazi { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2.6vh; }
+.kurulum h1 { font-size: clamp(24px, 6.6vh, 46px); line-height: 1.1; }
+.kurulum .alt-dil { color: var(--muted); font-size: clamp(13px, 2.8vh, 20px); font-weight: 700; margin-top: -1.4vh; }
+.kurulum ol { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 1.4vh; font-size: clamp(15px, 3.4vh, 24px); font-weight: 700; }
+.kurulum .adres { font-family: ui-monospace, Menlo, monospace; font-size: clamp(12px, 2.6vh, 18px); color: var(--muted); word-break: break-all; }
+.kurulum .kod { display: inline-block; font-family: ui-monospace, Menlo, monospace; font-weight: 900; letter-spacing: .25em; background: var(--card); border-radius: 12px; padding: .4vh 1vw; box-shadow: 0 2px 8px rgba(29,36,51,.1); }
+.kurulum .qrlar { display: flex; gap: 3vw; align-items: center; }
+.kurulum figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 1.4vh; }
+.kurulum .qr { background: #fff; padding: 2.4vh; border-radius: 20px; box-shadow: 0 8px 24px rgba(29,36,51,.14); line-height: 0; }
+.kurulum .qr svg { width: 100%; height: 100%; display: block; }
+.kurulum figcaption { font-size: clamp(13px, 2.8vh, 20px); font-weight: 900; }
+.kurulum .numara { display: inline-flex; width: 1.6em; height: 1.6em; border-radius: 50%; background: var(--accent); color: #fff; align-items: center; justify-content: center; margin-right: .4em; font-size: .9em; }
+.kurulum .cevir { position: absolute; left: 1.6vw; bottom: 2vh; display: flex; align-items: center; gap: 8px; color: var(--muted); font-weight: 800; font-size: clamp(12px, 2.6vh, 18px); padding: 1vh 1.4vw; border-radius: 999px; background: var(--card); box-shadow: 0 2px 8px rgba(29,36,51,.1); }
+.kurulum .cevir svg { width: 1.3em; height: 1.3em; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
@@ -175,8 +191,19 @@ body.gece .hap { background: #2A2416; color: #E9C98A; }
 
 <div class="baglanti" id="baglanti" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2l20 20"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M5 12.86a10 10 0 0 1 5.17-2.69"/><path d="M19 12.86a10 10 0 0 0-2.01-1.48"/><path d="M12 20h.01"/></svg><span id="baglantiYazi">İnternet yok, mesajlar sonra gidecek</span></div>
 <div class="bildirim" id="bildirim" hidden></div>
+<div class="kurulum" id="kurulum" hidden>
+  <div class="yazi">
+    <h1 id="kuBaslik"></h1>
+    <div class="alt-dil" id="kuAlt"></div>
+    <ol id="kuAdimlar"></ol>
+    <div class="adres" id="kuAdres"></div>
+  </div>
+  <div class="qrlar" id="kuQrlar"></div>
+  <button class="cevir" id="kuCevir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg><span id="kuCevirYazi"></span></button>
+</div>
 <div class="uyku" id="uyku"><div class="saat-kutu" id="saatKutu"><div class="saat" id="saat">--:--</div><div class="tarih" id="tarih"></div></div></div>
 <audio id="ses" preload="none"></audio>
+<script src="/static/vendor/qrcode.js"></script>
 
 <script>
 (function () {
@@ -201,7 +228,14 @@ const METIN = {
         anahtar: "Bot anahtarı hatalı", yeni_mesaj: "yeni mesaj",
         gunler: ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"],
         aylar: ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"],
-        tarih: (g, d, a) => `${g}, ${d} ${a}` },
+        tarih: (g, d, a) => `${g}, ${d} ${a}`,
+        ku_baslik: "Merhaba! Kurulumu telefonundan yap", ku_alt: "Hi! Set me up from your phone",
+        ku_wifi_baslik: "Wi-Fi'ye bağlanamadım", ku_wifi_alt: "I can't reach the Wi-Fi",
+        ku_adim_wifi: "Telefonunla 1. kodu okut: kutunun kurulum ağına bağlanırsın", ku_adim_ac: "2. kodu okut: kurulum sayfası açılır", ku_adim_ac_y: "2. kodu okut: yönetim sayfası açılır",
+        ku_hata: "Bağlanamadım; Wi-Fi şifresi yanlış olabilir. Bir daha dene.",
+        ku_adim_tek: "Telefonunun kamerasıyla bu kodu okut", ku_adim_kod: "Sorarsa bu kodu yaz:",
+        ku_adim_ev: "Sayfada evinin Wi-Fi'sini seç", ku_ag: "Kurulum ağı", ku_sayfa: "Kurulum sayfası", ku_yonetim: "Yönetim sayfası",
+        ku_cevir: "Ekran ters mi?" },
   en: { baslik: "Who do you want to talk to?", bos_baslik: "No one added yet", bos_alt: "Add people from the admin page:",
         geri: "Back to people", kayit_basla: "Start recording", kayit_bitir: "Finish and send", konus: "Tap to talk",
         bitirince: "Tap when done", dinle: "Play last message", durdur: "Stop", mesaj_yok: "No messages yet",
@@ -211,7 +245,14 @@ const METIN = {
         anahtar: "Bot key is wrong", yeni_mesaj: "new messages",
         gunler: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
         aylar: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
-        tarih: (g, d, a) => `${g}, ${a} ${d}` },
+        tarih: (g, d, a) => `${g}, ${a} ${d}`,
+        ku_baslik: "Hi! Set me up from your phone", ku_alt: "Merhaba! Kurulumu telefonundan yap",
+        ku_wifi_baslik: "I can't reach the Wi-Fi", ku_wifi_alt: "Wi-Fi'ye bağlanamadım",
+        ku_adim_wifi: "Scan code 1 with your phone to join the box's setup network", ku_adim_ac: "Scan code 2 to open the setup page", ku_adim_ac_y: "Scan code 2 to open the admin page",
+        ku_hata: "Couldn't connect; the Wi-Fi password may be wrong. Try again.",
+        ku_adim_tek: "Scan this code with your phone's camera", ku_adim_kod: "If asked, enter this code:",
+        ku_adim_ev: "Pick your home Wi-Fi on the page", ku_ag: "Setup network", ku_sayfa: "Setup page", ku_yonetim: "Admin page",
+        ku_cevir: "Screen upside down?" },
 };
 const t = (k, v = {}) => { const x = (METIN[D.dil] || METIN.tr)[k]; return typeof x === "string" ? x.replace(/\{(\w+)\}/g, (_, a) => v[a]) : x; };
 let sonDil = null;
@@ -237,7 +278,7 @@ async function durumAl() {
   if (window.ilkSurum && D.surum && D.surum !== window.ilkSurum) { location.reload(); return; }
   window.ilkSurum = window.ilkSurum || D.surum;
   metinleriUygula(); sonListe = ""; if (simdiki) dinleCiz(); saatCiz();
-  baglantiGoster();
+  baglantiGoster(); kurulumCiz();
   if (simdiki && !kisiBul(simdiki)) anaya();
   ciz();
 }
@@ -246,6 +287,40 @@ async function mesajlariAl() {
   const r = await fetch("/api/mesajlar/" + simdiki); const ms = await r.json();
   listeCiz(ms);
 }
+
+/* ---------- kurulum (QR) ---------- */
+// Anahtarı olmayan yeni kutu ya da Wi-Fi'ye bağlanamayıp kendi ağını açmış kutu: ekranda telefonla okutulacak QR.
+const qrSvg = metin => { const q = qrcode(0, "M"); q.addData(metin); q.make(); return q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); };
+const wifiKac = x => String(x).replace(/([\\;,:"])/g, "\\$1");
+let sonKurulum = "";
+function kurulumAcik() { return !!(D.kurulum || (D.wifi && D.wifi.mod === "hotspot")); }
+function kurulumCiz() {
+  const acik = kurulumAcik(); $("kurulum").hidden = !acik;
+  if (!acik) { sonKurulum = ""; return; }
+  const w = D.wifi || {}, hs = w.mod === "hotspot";
+  const adres = D.kurulum ? D.kurulum.adres : `http://${w.ip || "10.42.0.1"}:${location.port || 80}/yonetim`;
+  const imza = JSON.stringify([adres, hs, w.hotspot_ssid, w.hotspot_sifre, w.hata, D.dil, D.kurulum && D.kurulum.kod]);
+  if (imza === sonKurulum) return; sonKurulum = imza;
+  $("kuBaslik").textContent = t(D.kurulum ? "ku_baslik" : "ku_wifi_baslik");
+  $("kuAlt").textContent = hs && w.hata ? t("ku_hata") : t(D.kurulum ? "ku_alt" : "ku_wifi_alt");
+  $("kuAlt").style.color = hs && w.hata ? "var(--rec)" : "";
+  const kod = D.kurulum ? `<li>${t("ku_adim_kod")} <span class="kod">${D.kurulum.kod}</span></li>` : "";
+  const boy = hs ? "min(36vh, 22vw)" : "min(62vh, 38vw)";
+  const fig = (no, metin, yazi) => `<figure><div class="qr" style="width:${boy};height:${boy}">${qrSvg(metin)}</div><figcaption>${no ? `<span class="numara">${no}</span>` : ""}${yazi}</figcaption></figure>`;
+  if (hs) {
+    const wq = `WIFI:T:${w.hotspot_sifre ? "WPA" : "nopass"};S:${wifiKac(w.hotspot_ssid)};${w.hotspot_sifre ? "P:" + wifiKac(w.hotspot_sifre) + ";" : ""};`;
+    $("kuAdimlar").innerHTML = `<li>${t("ku_adim_wifi")}</li><li>${t(D.kurulum ? "ku_adim_ac" : "ku_adim_ac_y")}</li>${kod}<li>${t("ku_adim_ev")}</li>`;
+    $("kuQrlar").innerHTML = fig(1, wq, `${t("ku_ag")}: ${w.hotspot_ssid}`) + fig(2, adres, t(D.kurulum ? "ku_sayfa" : "ku_yonetim"));
+    $("kuAdres").textContent = `${w.hotspot_ssid}${w.hotspot_sifre ? " · " + w.hotspot_sifre : ""} → ${adres.replace(/\?k=.*/, "")}`;
+  } else {
+    $("kuAdimlar").innerHTML = `<li>${t("ku_adim_tek")}</li>${kod}`;
+    $("kuQrlar").innerHTML = fig(0, adres, t("ku_sayfa"));
+    $("kuAdres").textContent = adres.replace(/\?k=.*/, "");
+  }
+  $("kuCevirYazi").textContent = t("ku_cevir"); $("kuCevir").hidden = !D.kurulum;
+}
+$("kuCevir").addEventListener("click", () => fetch("/api/kurulum/ekran_cevir", { method: "POST" }).catch(() => {}));
+setInterval(() => { if (kurulumAcik()) durumAl().catch(() => {}); }, 4000);
 
 /* ---------- ana ekran ---------- */
 // En fazla 3x3 = 9 kişi bir sayfada; fazlası sonraki sayfalara (kaydırarak ya da oklarla).
@@ -468,7 +543,7 @@ document.addEventListener("pointercancel", uyanmaBitti, true);
 document.addEventListener("keydown", uyandir, true);
 setInterval(() => {
   const bos = (Date.now() - sonDokunma) / 60000;
-  if (mod === "kayit" || !ses.paused) { sonDokunma = Date.now(); return; }
+  if (mod === "kayit" || !ses.paused || kurulumAcik()) { sonDokunma = Date.now(); return; }
   if (simdiki && bos > Math.min(2, D.uyku_dakika || 2)) anaya();
   if (bos > (D.uyku_dakika || 2) && !$("uyku").classList.contains("acik")) { $("uyku").classList.add("acik"); uykuBildir(true); }
 }, 5000);
