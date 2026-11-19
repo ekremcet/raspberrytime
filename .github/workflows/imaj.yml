@@ -29,6 +29,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # pi-gen-action's own disk cleanup (increase-runner-disk-size) breaks on current runners
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+                      /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/share/swift || true
+          docker system prune -af || true
+          df -h /
+
       - name: Put the app into the image stage
         run: |
           hedef=imaj/stage-mesajkutusu/00-mesajkutusu/files/mesajkutusu
@@ -55,7 +63,7 @@ jobs:
           enable-ssh: 0
           compression: xz
           compression-level: 6
-          increase-runner-disk-size: true
+          increase-runner-disk-size: false
           verbose-output: true
 
       - name: Upload as workflow artifact
