@@ -6,6 +6,7 @@ name: SD card image
 on:
   push:
     tags: ["v*"]
+    branches: ["imaj-deneme"]       # test builds: push to this branch, download from the run page
   workflow_dispatch:
     inputs:
       wifi_country:
@@ -58,7 +59,7 @@ jobs:
           verbose-output: true
 
       - name: Upload as workflow artifact
-        if: github.event_name == 'workflow_dispatch'
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         uses: actions/upload-artifact@v4
         with:
           name: mesajkutusu-image
