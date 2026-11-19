@@ -3,7 +3,7 @@ name: Tablet app
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "tablet-yayin"]     # tablet-yayin: her gönderim bir sürüm yayınlar
     paths: ["android/**", "yazilim/mesajkutusu/**", ".github/workflows/tablet.yml"]
     tags: ["tablet-v*"]
   workflow_dispatch:
@@ -29,7 +29,7 @@ jobs:
           gradle-version: "8.9"
       - name: Build APK
         env:
-          APK_ETIKET: ${{ startsWith(github.ref, 'refs/tags/tablet-v') && github.ref_name || format('gelistirme-{0}', github.run_number) }}
+          APK_ETIKET: ${{ startsWith(github.ref, 'refs/tags/tablet-v') && github.ref_name || (github.ref == 'refs/heads/tablet-yayin' && format('tablet-v1.{0}', github.run_number) || format('gelistirme-{0}', github.run_number)) }}
         run: |
           export BUILD_PYTHON="$(which python3)"
           gradle -p android assembleRelease --stacktrace
@@ -72,7 +72,7 @@ jobs:
 
   release:
     needs: [apk, emulator]
-    if: startsWith(github.ref, 'refs/tags/tablet-v')
+    if: startsWith(github.ref, 'refs/tags/tablet-v') || github.ref == 'refs/heads/tablet-yayin'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v4
@@ -80,6 +80,9 @@ jobs:
           name: mesajkutusu-apk
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('tablet-v1.{0}', github.run_number) }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('Tablet app 1.{0}', github.run_number) }}
+          target_commitish: ${{ github.sha }}
           files: mesajkutusu.apk
           body: |
             Tablet app for the voice message box (Android 8+). Install the APK on the tablet, open "Mesaj Kutusu",
