@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   image:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04            # pi-gen-action disk cleanup fails on the 26.04 runner
     timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
