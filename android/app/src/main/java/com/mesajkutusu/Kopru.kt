@@ -133,6 +133,19 @@ object Kopru {
 
     fun kilitAcikMi(): Boolean = SystemClock.elapsedRealtime() < kilitAcikBitis
 
+    /** Tam kilidi (cihaz sahibi) kaldırır; uygulama normal bir uygulamaya döner, kaldırılabilir. */
+    @JvmStatic fun sahiplikBirak(): Boolean {
+        if (!cihazSahibi()) return false
+        ui { it.kilitBirak() }
+        dpm.setStatusBarDisabled(yonetici, false)
+        dpm.setKeyguardDisabled(yonetici, false)
+        dpm.clearPackagePersistentPreferredActivities(yonetici, app.packageName)
+        dpm.setLockTaskPackages(yonetici, arrayOf())
+        @Suppress("DEPRECATION")
+        dpm.clearDeviceOwnerApp(app.packageName)
+        return true
+    }
+
     @JvmStatic fun cihazYenidenBaslat(): Boolean {
         if (!cihazSahibi()) return false
         dpm.reboot(yonetici)

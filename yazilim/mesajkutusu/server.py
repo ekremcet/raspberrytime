@@ -1508,7 +1508,11 @@ async def y_kilit(req):
     k = kopru()
     if req.method == "POST":
         veri = await req.json()
-        if veri.get("ac"):
+        if veri.get("tam_kilidi_kaldir"):
+            if not k.sahiplikBirak():
+                raise web.HTTPBadRequest(text="Tam kilit zaten yok")
+            log.info("tam kilit (cihaz sahibi) kaldırıldı")
+        elif veri.get("ac"):
             k.kilitAc(int(max(1, min(120, int(veri.get("dakika") or 10)))))
         else:
             k.kilitle()

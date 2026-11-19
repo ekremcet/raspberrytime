@@ -249,7 +249,8 @@ pre.kayit { background: var(--bg); border: 1px solid var(--line); border-radius:
       <section class="kart bilgi" id="kilitKart" hidden>
         <h2>Tablet kilidi</h2>
         <p class="kucuk" style="margin:0" id="kilitDurum"></p>
-        <div class="satir"><button type="button" id="kilitAc">Kilidi 10 dakika aç</button><button type="button" id="kilitle">Şimdi kilitle</button></div>
+        <div class="satir"><button type="button" id="kilitAc">Kilidi 10 dakika aç</button><button type="button" id="kilitle">Şimdi kilitle</button>
+          <button type="button" class="tehlike" id="tamKilitKaldir" hidden>Tam kilidi kaldır</button></div>
         <p class="kucuk" style="margin:0">Kilit açıkken tabletin ana ekranına ve ayarlarına geçebilirsin. Süre dolunca ya da kutu uygulamasına dönünce yeniden kilitlenir.</p>
       </section>
       <section class="kart bilgi">
@@ -427,6 +428,7 @@ function sistemCiz(d) {
   $("guncelKayit").hidden = !d.guncelleme_log; $("guncelKayit").textContent = d.guncelleme_log || "";
 }
 function kilitCiz(k) {
+  $("tamKilitKaldir").hidden = !k.cihaz_sahibi;
   $("kilitDurum").textContent = !k.kilitli ? `Kilit açık${k.kalan_dk ? ` (${k.kalan_dk} dk sonra kilitlenir)` : ""}.`
     : k.cihaz_sahibi ? "Kilitli: tam kilit (cihaz sahibi). Çocuk kutu uygulamasından çıkamaz."
     : "Kilitli: uygulama sabitlendi. Tam kilit için README'deki cihaz sahibi adımına bak.";
@@ -435,6 +437,12 @@ async function kilitYukle() { try { kilitCiz(await api("/api/yonetim/kilit")); }
 const kilitIslem = (veri, yazi) => kaydet(() => api("/api/yonetim/kilit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(veri) }), yazi).then(kilitCiz).catch(() => {});
 $("kilitAc").addEventListener("click", () => kilitIslem({ ac: true, dakika: 10 }, "✓ Kilit 10 dakika açık"));
 $("kilitle").addEventListener("click", () => kilitIslem({ ac: false }, "✓ Kilitlendi"));
+let kaldirOnay = 0;
+$("tamKilitKaldir").addEventListener("click", e => {
+  if (Date.now() - kaldirOnay > 4000) { kaldirOnay = Date.now(); e.target.textContent = "Emin misin? Bir daha dokun"; return; }
+  e.target.textContent = "Tam kilidi kaldır";
+  kilitIslem({ tam_kilidi_kaldir: true }, "✓ Tam kilit kaldırıldı; uygulama artık silinebilir");
+});
 async function sistemYukle() { try { sistemCiz(await api("/api/yonetim/sistem")); } catch (e) {} wifiYukle(); }
 async function wifiYukle() {
   let d; try { d = await api("/api/yonetim/wifi"); } catch (e) { return; }

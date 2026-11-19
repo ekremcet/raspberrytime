@@ -9,6 +9,10 @@ Inspired by [button.box](https://button.box); it uses a 7" touchscreen instead o
 - No SIM card, phone line or app required. Only people you approve can reach the box.
 - Plug-and-play setup: flash the ready-made SD card image, power on, scan the QR code on the screen and finish everything (Wi-Fi, Telegram bot, PIN, yourself as the first contact) from your phone.
 
+**Two ways to build it:**
+- **Raspberry Pi box** (this page): a Pi with a 7" touchscreen in a 3D-printed case.
+- **[Android tablet](android/README.md)**: the same software as one app on an ordinary tablet (e.g. Galaxy Tab A11), locked to the app. Cheaper, has a battery, nothing to assemble.
+
 ![Case](donanim/gorseller/kasa_onizleme.png)
 ![Interface](yazilim/gorseller/arayuz.png)
 
@@ -20,6 +24,7 @@ Inspired by [button.box](https://button.box); it uses a 7" touchscreen instead o
 |---|---|
 | [`donanim/`](donanim/) (hardware) | Parts list, 3D-print files (STL), parametric case model (`kasa.py`), step-by-step assembly |
 | [`yazilim/`](yazilim/) (software) | The box software (`mesajkutusu/`), installation, setup wizard, Telegram bot, remote updates, troubleshooting |
+| [`android/`](android/) (tablet) | Android kiosk app that runs the same server; build, emulator test and release workflow |
 | [`imaj/`](imaj/) (image) | pi-gen stage for the ready-made SD card image, built by [`.github/workflows/imaj.yml`](.github/workflows/imaj.yml) |
 
 ## Roadmap from start to finish
