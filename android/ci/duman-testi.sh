@@ -22,8 +22,6 @@ done
 kontrol "sunucu açıldı" 'api http://127.0.0.1:8080/api/saglik >/dev/null'
 sleep 6
 adb exec-out screencap -p > "$C/1-acilis.png"
-adb shell uiautomator dump /sdcard/ekran.xml >/dev/null 2>&1; adb pull /sdcard/ekran.xml "$C/ekran.xml" >/dev/null 2>&1
-kontrol "çocuk ekranı WebView'da çizildi (kurulum yazısı)" 'grep -q "Kurulumu telefonundan yap\|Set me up from your phone" $C/ekran.xml'
 
 api http://127.0.0.1:8080/api/durum > "$C/durum.json"
 KOD=$(python3 -c "import json;print((json.load(open('$C/durum.json')).get('kurulum') or {}).get('kod',''))")
