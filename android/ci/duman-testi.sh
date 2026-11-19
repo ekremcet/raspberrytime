@@ -59,7 +59,8 @@ adb exec-out screencap -p > "$C/3-kilitli.png"
 api "${P[@]}" -X POST http://127.0.0.1:8080/api/yonetim/kilit -d '{"ac":true,"dakika":5}' > "$C/kilit-ac.json"; cat "$C/kilit-ac.json"; echo
 kontrol "kilit geçici açıldı" 'grep -q "\"kilitli\": false" $C/kilit-ac.json'
 api "${P[@]}" -X POST http://127.0.0.1:8080/api/yonetim/sistem -d '{"islem":"uygulama"}' >/dev/null
-sleep 5
+sleep 3
+for i in $(seq 1 15); do api http://127.0.0.1:8080/api/saglik >/dev/null && break; sleep 2; done
 kontrol "sunucu kendi içinde yeniden başladı" 'api http://127.0.0.1:8080/api/saglik >/dev/null'
 
 # Ekran görüntüleri günlüğe (indirmeden bakabilmek için)
@@ -68,5 +69,6 @@ for f in "$C/1-acilis.png" "$C/3-kilitli.png"; do
 done
 adb logcat -d > "$C/logcat.txt"
 grep -n "Traceback\|python.stderr" "$C/logcat.txt" | head -40
+grep -n "sunucu hazır\|yeniden başlatılıyor" "$C/logcat.txt" | tail -6
 kontrol "Python hatası yok" '! grep -q "Traceback" $C/logcat.txt'
 exit $HATA
