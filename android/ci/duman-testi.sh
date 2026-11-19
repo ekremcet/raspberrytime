@@ -22,6 +22,8 @@ done
 kontrol "sunucu açıldı" 'api http://127.0.0.1:8080/api/saglik >/dev/null'
 sleep 6
 adb exec-out screencap -p > "$C/1-acilis.png"
+adb shell uiautomator dump /sdcard/ekran.xml >/dev/null 2>&1; adb pull /sdcard/ekran.xml "$C/ekran.xml" >/dev/null 2>&1
+kontrol "çocuk ekranı WebView'da çizildi (kurulum yazısı)" 'grep -q "Kurulumu telefonundan yap\|Set me up from your phone" $C/ekran.xml'
 
 api http://127.0.0.1:8080/api/durum > "$C/durum.json"
 KOD=$(python3 -c "import json;print((json.load(open('$C/durum.json')).get('kurulum') or {}).get('kod',''))")
@@ -62,6 +64,10 @@ api "${P[@]}" -X POST http://127.0.0.1:8080/api/yonetim/sistem -d '{"islem":"uyg
 sleep 5
 kontrol "sunucu kendi içinde yeniden başladı" 'api http://127.0.0.1:8080/api/saglik >/dev/null'
 
+# Ekran görüntüleri günlüğe (indirmeden bakabilmek için)
+for f in "$C/1-acilis.png" "$C/3-kilitli.png"; do
+  echo "=====PNG $(basename "$f")"; base64 -w0 "$f"; echo; echo "=====SON"
+done
 adb logcat -d > "$C/logcat.txt"
 grep -n "Traceback\|python.stderr" "$C/logcat.txt" | head -40
 kontrol "Python hatası yok" '! grep -q "Traceback" $C/logcat.txt'
